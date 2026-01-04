@@ -1891,37 +1891,6 @@ export function getAllQARules(): QARuleDefinition[] {
     return [...QA_RULES];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEFAULT EXPORT
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export default {
-    injectInternalLinks,
-    validateAnchorQuality,
-    validateAnchorStrict,
-    generateSemanticAnchorCandidates,
-    runQASwarm,
-    getAllQARules,
-    registerQARule,
-    calculateSeoMetrics,
-    analyzeExistingContent,
-    calculateNLPCoverage,
-    calculateFleschKincaid,
-    calculateSMOGIndex,
-    calculateGunningFog,
-    calculateColemanLiau,
-    calculateARI,
-    getReadabilityInterpretation,
-    removeAllH1Tags,
-    removeDuplicateFAQSections,
-    validateNoH1,
-    countFAQSections,
-    sanitizeSlug,
-    sanitizeTitle,
-    extractSlugFromUrl,
-    calculateOpportunityScore,
-    computeDynamicThresholds,
-    formatDuration,
     formatNumber,
     sleep,
     generateId,
