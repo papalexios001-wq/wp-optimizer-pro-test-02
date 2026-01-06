@@ -42,9 +42,7 @@ export async function enrichContentWithReferencesYouTubeAndCTA(
       log?.(' → Integrating YouTube video...');
       const youtubeResult = await integrateYouTubeVideoIntoContent(
         html,
-        articleTitle,
-        serperApiKey,
-        log('Integrating YouTube video...')
+        articleTitle
       );
       html = youtubeResult;
     } else {
