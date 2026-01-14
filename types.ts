@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// WP OPTIMIZER PRO — COMPLETE TYPE DEFINITIONS (FINAL)
+// WP OPTIMIZER PRO — COMPLETE TYPE DEFINITIONS (FINAL FIX)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const APP_VERSION = "22.15.0";
@@ -38,7 +38,7 @@ export interface Toast {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WORDPRESS CONFIG — ALL OPTIONAL EXCEPT CORE
+// WORDPRESS CONFIG
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface WpConfig {
@@ -93,7 +93,7 @@ export interface GeoTargetConfig {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OPPORTUNITY SCORE — ALL OPTIONAL EXCEPT total AND factors
+// OPPORTUNITY SCORE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface OpportunityScore {
@@ -111,7 +111,7 @@ export interface OpportunityScore {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IMPROVEMENT HISTORY — MOST OPTIONAL
+// IMPROVEMENT HISTORY
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface ImprovementHistoryEntry {
@@ -130,7 +130,7 @@ export interface ImprovementHistoryEntry {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GOD MODE PHASES — ALL PHASES YOUR CODE USES
+// GOD MODE PHASES — ALL PHASES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export type GodModePhase = 
@@ -163,17 +163,18 @@ export type GodModePhase =
     | 'collect_intel'
     | 'strategic_intel'
     | 'competitor_deep_dive'
+    | 'outline_generation'
     | 'running';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GOD MODE JOB STATE — ALL OPTIONAL EXCEPT id, targetId, phase
+// GOD MODE JOB STATE — id is OPTIONAL for store.ts compatibility
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface GodModeJobState {
-    id: string;
+    id?: string;
     targetId: string;
     phase: GodModePhase;
-    status?: 'idle' | 'processing' | 'completed' | 'failed' | 'queued' | 'analyzing' | 'analyzed' | 'error' | 'running';
+    status?: string;
     progress?: number;
     logs?: string[];
     log?: string[];
@@ -197,7 +198,7 @@ export interface GodModeJobState {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SEO METRICS — ALL OPTIONAL EXCEPT CORE
+// SEO METRICS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface CoreWebVitals {
@@ -257,7 +258,7 @@ export function createDefaultSeoMetrics(): SeoMetrics {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SITEMAP PAGE — lastPublishedAt ADDED
+// SITEMAP PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SitemapPage {
@@ -269,7 +270,7 @@ export interface SitemapPage {
     wordCount: number | null;
     crawledContent: string | null;
     healthScore: number | null;
-    status: 'idle' | 'processing' | 'completed' | 'failed' | 'queued' | 'analyzing' | 'analyzed' | 'error' | 'running';
+    status: string;
     opportunity: OpportunityScore;
     improvementHistory: ImprovementHistoryEntry[];
     jobState?: GodModeJobState;
@@ -286,7 +287,7 @@ export interface SitemapPage {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INTERNAL LINK TYPES
+// INTERNAL LINK TYPES — ALL EXPORTED
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface InternalLinkTarget {
@@ -475,7 +476,7 @@ export interface ContentContract {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPETITOR ANALYSIS — hasFAQ, hasSchema ADDED
+// COMPETITOR ANALYSIS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface CompetitorAnalysis {
@@ -493,7 +494,7 @@ export interface CompetitorAnalysis {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ENTITY GAP ANALYSIS — knowledgeGraphData, localPackPresent ADDED
+// ENTITY GAP ANALYSIS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface EntityGapAnalysis {
@@ -521,7 +522,7 @@ export interface EntityGapAnalysis {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SerpFeature {
-    type: 'featured_snippet' | 'people_also_ask' | 'knowledge_panel' | 'local_pack' | 'video_carousel' | 'image_pack';
+    type: string;
     present: boolean;
     opportunity: boolean;
     data?: any;
@@ -548,7 +549,7 @@ export interface NeuronAnalysisResult {
     competitorAnalysis?: any;
     competitors?: any[];
     contentScore?: number;
-    status?: 'success' | 'error' | 'pending' | 'ready';
+    status?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -566,7 +567,7 @@ export interface ValidatedReference {
     snippet?: string;
     citationCount?: number;
     trustScore?: number | string;
-    status?: 'valid' | 'invalid' | 'pending' | number | string;
+    status?: string | number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -657,7 +658,7 @@ export interface GeneratedSection {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUTONOMOUS CONFIG — minWordCount ADDED
+// AUTONOMOUS CONFIG — enableAEO ADDED
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface AutonomousConfig {
@@ -675,10 +676,13 @@ export interface AutonomousConfig {
     processNewPagesOnly?: boolean;
     prioritizeByOpportunity?: boolean;
     minWordCount?: number;
+    enableAEO?: boolean;
+    enableGEO?: boolean;
+    enableNLP?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CACHE & LOCKS — ALL OPTIONAL
+// CACHE & LOCKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface CacheEntry<T = any> {
@@ -702,7 +706,7 @@ export interface ProcessingLock {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface StageProgress {
-    stage: 'outline' | 'sections' | 'merge' | 'polish' | 'enhancement';
+    stage: string;
     progress: number;
     message: string;
     sectionsCompleted?: number;
@@ -721,7 +725,7 @@ export interface NLPInjectionResult {
     finalCoverage: number;
     insertionDetails: Array<{
         term: string;
-        location: 'paragraph' | 'list' | 'heading' | 'callout';
+        location: string;
         template: string;
         contextScore: number;
     }>;
@@ -815,7 +819,7 @@ export interface WordPressPost {
     content: { rendered?: string; raw?: string };
     excerpt: { rendered?: string; raw?: string };
     slug: string;
-    status: 'publish' | 'draft' | 'pending' | 'private';
+    status: string;
     categories?: number[];
     tags?: number[];
     featured_media?: number;
