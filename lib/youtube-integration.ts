@@ -69,7 +69,8 @@ export async function searchAndValidateYouTubeVideo(
         let views = 0;
         if (viewsMatch) {
           views = parseFloat(viewsMatch[1].replace(/,/g, ''));
-          const multiplier = { K: 1000, M: 1000000, B: 1000000000 }[viewsMatch[2]?.toUpperCase()] || 1;
+          const multiplierKey = viewsMatch[2]?.toUpperCase() as 'K' | 'M' | 'B' | undefined;
+          const multiplier = multiplierKey ? { K: 1000, M: 1000000, B: 1000000000 }[multiplierKey] : 1;
           views *= multiplier;
         }
         
