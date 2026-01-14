@@ -1,16 +1,26 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// WP OPTIMIZER PRO v26.0 — COMPLETE TYPE DEFINITIONS
+// WP OPTIMIZER PRO — COMPLETE TYPE DEFINITIONS (MATCHING EXISTING CODEBASE)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const APP_VERSION = "26.0.0";
+export const APP_VERSION = "22.15.0";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📌 CORE TYPES
+// BASIC TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
+
+export type Provider = 'google' | 'openrouter' | 'anthropic' | 'openai' | 'groq';
+export type OptimizationMode = 'surgical' | 'writer' | 'hybrid';
+export type PublishMode = 'draft' | 'publish' | 'pending';
 
 export interface FAQ {
     question: string;
     answer: string;
+}
+
+export interface FAQItem {
+    question: string;
+    answer: string;
+    category?: string;
 }
 
 export interface HeadingInfo {
@@ -19,14 +29,61 @@ export interface HeadingInfo {
     id?: string;
 }
 
+export interface Toast {
+    id: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    message: string;
+    duration?: number;
+}
+
+export interface WpConfig {
+    siteUrl: string;
+    username: string;
+    applicationPassword: string;
+    restEndpoint?: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📊 OPPORTUNITY SCORE — FULL INTERFACE
+// API KEYS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface ApiKeys {
+    google: string;
+    openrouter: string;
+    anthropic: string;
+    openai: string;
+    groq: string;
+    serper: string;
+    neuronwriter?: string;
+    neuronProject?: string;
+    openrouterModel?: string;
+    groqModel?: string;
+    geminiModel?: string;
+    [key: string]: string | undefined;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GEO TARGET CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface GeoTargetConfig {
+    enabled: boolean;
+    country: string;
+    language: string;
+    region?: string;
+    city?: string;
+    localKeywords?: string[];
+    currencySymbol?: string;
+    measurementSystem?: 'metric' | 'imperial';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OPPORTUNITY SCORE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface OpportunityScore {
     total: number;
     factors: Record<string, number>;
-    // Additional properties expected by App.tsx
     commercialIntent: number;
     temporalDecay: number;
     strikingDistance: number;
@@ -36,8 +93,10 @@ export interface OpportunityScore {
     conversionPotential: number;
 }
 
-// Helper to create default opportunity score
-export function createDefaultOpportunityScore(total: number = 0, factors: Record<string, number> = {}): OpportunityScore {
+export function createDefaultOpportunityScore(
+    total: number = 0, 
+    factors: Record<string, number> = {}
+): OpportunityScore {
     return {
         total,
         factors,
@@ -52,74 +111,85 @@ export function createDefaultOpportunityScore(total: number = 0, factors: Record
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📄 SITEMAP PAGE
+// IMPROVEMENT HISTORY
 // ═══════════════════════════════════════════════════════════════════════════════
-
-export interface SitemapPage {
-    id: string;
-    title: string;
-    slug: string;
-    url?: string;
-    lastMod: string | null;
-    wordCount: number | null;
-    crawledContent: string | null;
-    healthScore: number | null;
-    status: 'idle' | 'processing' | 'completed' | 'failed' | 'queued';
-    opportunity: OpportunityScore;
-    improvementHistory: ImprovementHistoryEntry[];
-    // Optional additional fields
-    priority?: number;
-    changefreq?: string;
-    excerpt?: string;
-    categories?: string[];
-    tags?: string[];
-}
 
 export interface ImprovementHistoryEntry {
     date: string;
+    timestamp: number;
     wordsBefore: number;
     wordsAfter: number;
+    wordCount: number;
     scoreBefore: number;
     scoreAfter: number;
+    score: number;
+    qaScore: number;
     changes: string[];
+    action: string;
+    version: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔗 INTERNAL LINK TYPES — FIXED TO MATCH USAGE
+// GOD MODE PHASES & JOB STATE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export interface InternalLinkTarget {
-    url: string;
-    title: string;
-    slug?: string;
-    keywords?: string[];
-    relevance?: number;
-    category?: string;
-}
+export type GodModePhase = 
+    | 'idle'
+    | 'initializing'
+    | 'crawling'
+    | 'fetching_sitemap'
+    | 'resolving_post'
+    | 'analyzing'
+    | 'analyzing_content'
+    | 'analyzing_existing'
+    | 'entity_gap_analysis'
+    | 'neuron_analysis'
+    | 'reference_validation'
+    | 'prompt_assembly'
+    | 'content_generation'
+    | 'content_synthesis'
+    | 'youtube_integration'
+    | 'nlp_injection'
+    | 'internal_linking'
+    | 'faq_upgrade'
+    | 'qa_validation'
+    | 'self_improvement'
+    | 'final_polish'
+    | 'publishing'
+    | 'completed'
+    | 'failed'
+    | 'error';
 
-// This is what injectInternalLinks returns for EACH link added
-export interface InternalLinkAddedItem {
-    url: string;
-    anchorText: string;
-    relevanceScore: number;
-    position: number;
+export interface GodModeJobState {
+    id: string;
+    targetId: string;
+    phase: GodModePhase;
+    status: 'idle' | 'processing' | 'completed' | 'failed' | 'queued' | 'analyzing' | 'analyzed' | 'error';
+    progress: number;
+    logs: string[];
+    startTime: number;
+    endTime?: number;
+    error?: string;
+    result?: ContentContract;
+    postId?: number;
+    existingAnalysis?: ExistingContentAnalysis;
+    targetKeyword?: string;
+    entityGapData?: EntityGapAnalysis;
+    neuronData?: NeuronAnalysisResult;
+    contract?: ContentContract;
+    qaResults?: QAValidationResult[];
+    allFeedback?: string[];
 }
-
-// This is the full result from injectInternalLinks function
-export interface InternalLinkInjectionResult {
-    html: string;
-    linksAdded: InternalLinkAddedItem[];
-    totalLinks: number;
-    skippedReasons?: Map<string, string>;
-}
-
-// This is what gets stored in ContentContract.internalLinks
-// Using the same structure as InternalLinkAddedItem for compatibility
-export type InternalLinkResult = InternalLinkAddedItem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📊 SEO METRICS — COMPLETE INTERFACE
+// SEO METRICS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+export interface CoreWebVitals {
+    lcp: number;
+    fid: number;
+    cls: number;
+}
 
 export interface SeoMetrics {
     wordCount: number;
@@ -132,7 +202,6 @@ export interface SeoMetrics {
     internalLinkScore: number;
     schemaDetected: boolean;
     schemaTypes: string[];
-    // Additional properties expected
     titleOptimization: number;
     metaOptimization: number;
     readabilityGrade: string;
@@ -148,13 +217,6 @@ export interface SeoMetrics {
     authorityScore: number;
 }
 
-export interface CoreWebVitals {
-    lcp: number;
-    fid: number;
-    cls: number;
-}
-
-// Helper to create default SEO metrics
 export function createDefaultSeoMetrics(): SeoMetrics {
     return {
         wordCount: 0,
@@ -184,7 +246,63 @@ export function createDefaultSeoMetrics(): SeoMetrics {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ✅ QA VALIDATION — FIXED WITH ruleId
+// SITEMAP PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SitemapPage {
+    id: string;
+    title: string;
+    slug: string;
+    url?: string;
+    lastMod: string | null;
+    wordCount: number | null;
+    crawledContent: string | null;
+    healthScore: number | null;
+    status: 'idle' | 'processing' | 'completed' | 'failed' | 'queued' | 'analyzing' | 'analyzed' | 'error';
+    opportunity: OpportunityScore;
+    improvementHistory: ImprovementHistoryEntry[];
+    jobState?: GodModeJobState;
+    seoMetrics?: SeoMetrics;
+    targetKeyword?: string;
+    priority?: number;
+    changefreq?: string;
+    excerpt?: string;
+    categories?: string[];
+    tags?: string[];
+    postId?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERNAL LINK TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface InternalLinkTarget {
+    url: string;
+    title: string;
+    slug?: string;
+    keywords?: string[];
+    relevance?: number;
+    category?: string;
+}
+
+export interface InternalLinkAddedItem {
+    url: string;
+    anchorText: string;
+    relevanceScore: number;
+    position: number;
+}
+
+export interface InternalLinkInjectionResult {
+    html: string;
+    linksAdded: InternalLinkAddedItem[];
+    totalLinks: number;
+    skippedReasons?: Map<string, string>;
+}
+
+export type InternalLinkResult = InternalLinkAddedItem;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QA VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface QAValidationResult {
@@ -198,7 +316,7 @@ export interface QAValidationResult {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📝 EXISTING CONTENT ANALYSIS — FIXED
+// EXISTING CONTENT ANALYSIS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface ExistingContentAnalysis {
@@ -209,7 +327,6 @@ export interface ExistingContentAnalysis {
     hasFAQ: boolean;
     hasSchema: boolean;
     quality: 'low' | 'medium' | 'high';
-    // Additional optional fields
     readabilityScore?: number;
     keywordDensity?: number;
     lastModified?: string;
@@ -223,8 +340,14 @@ export interface ExistingContentAnalysis {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📄 CONTENT CONTRACT
+// CONTENT CONTRACT
 // ═══════════════════════════════════════════════════════════════════════════════
+
+export interface GroundingSource {
+    uri: string;
+    title: string;
+    snippet?: string;
+}
 
 export interface ContentContract {
     title: string;
@@ -242,80 +365,27 @@ export interface ContentContract {
     featuredImagePrompt?: string;
     categoryNames?: string[];
     structureVerified?: boolean;
-    // Generation metadata
     generatedAt?: string;
     generationTime?: number;
     provider?: string;
     model?: string;
-    // Quality metrics
     qualityScore?: number;
     nlpCoverage?: number;
     visualComponentCount?: number;
 }
 
-export interface GroundingSource {
-    uri: string;
-    title: string;
-    snippet?: string;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔧 GENERATE CONFIG
+// COMPETITOR & ENTITY GAP ANALYSIS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export interface GenerateConfig {
-    topic: string;
-    mode: 'surgical' | 'writer';
-    provider: 'google' | 'openrouter' | 'anthropic' | 'openai' | 'groq';
-    model?: string;
-    temperature?: number;
-    siteContext: SiteContext;
-    apiKeys: ApiKeys;
-    // Optional enhancement data
-    entityGapData?: EntityGapAnalysis;
-    neuronData?: NeuronAnalysisResult;
-    existingAnalysis?: ExistingContentAnalysis;
-    allFeedback?: string[];
-    targetKeyword?: string;
-    validatedReferences?: ValidatedReference[];
-    internalLinks?: InternalLinkTarget[];
-    geoConfig?: GeoTargetConfig;
-    previousAttempts?: number;
-    // Pipeline options
-    useStagedPipeline?: boolean;
-    useSERPGenerators?: boolean;
-    useNLPInjector?: boolean;
-    targetNLPCoverage?: number;
-}
-
-export interface SiteContext {
+export interface CompetitorAnalysis {
     url: string;
-    orgName: string;
-    authorName: string;
-    language?: string;
-    country?: string;
-    industry?: string;
-    targetAudience?: string;
-    brandVoice?: string;
+    title: string;
+    wordCount: number;
+    headings: string[];
+    entities: string[];
+    score?: number;
 }
-
-export interface ApiKeys {
-    google: string;
-    openrouter: string;
-    anthropic: string;
-    openai: string;
-    groq: string;
-    serper: string;
-    neuronwriter?: string;
-    // Model selections
-    openrouterModel?: string;
-    groqModel?: string;
-    geminiModel?: string;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🧠 ENTITY GAP ANALYSIS
-// ═══════════════════════════════════════════════════════════════════════════════
 
 export interface EntityGapAnalysis {
     missingEntities: string[];
@@ -326,10 +396,25 @@ export interface EntityGapAnalysis {
     suggestedTopics?: string[];
     serpFeatures?: string[];
     validatedReferences?: ValidatedReference[];
+    competitors?: CompetitorAnalysis[];
+    recommendedWordCount?: number;
+    avgWordCount?: number;
+    featuredSnippetOpportunity?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🧬 NEURONWRITER TYPES
+// SERP FEATURES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SerpFeature {
+    type: 'featured_snippet' | 'people_also_ask' | 'knowledge_panel' | 'local_pack' | 'video_carousel' | 'image_pack';
+    present: boolean;
+    opportunity: boolean;
+    data?: any;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEURONWRITER TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface NeuronTerm {
@@ -338,6 +423,7 @@ export interface NeuronTerm {
     importance: number;
     recommended: number;
     current?: number;
+    count?: number;
 }
 
 export interface NeuronAnalysisResult {
@@ -346,10 +432,11 @@ export interface NeuronAnalysisResult {
     recommendations?: string[];
     competitorAnalysis?: any;
     contentScore?: number;
+    status?: 'success' | 'error' | 'pending';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📚 VALIDATED REFERENCE
+// VALIDATED REFERENCE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface ValidatedReference {
@@ -363,24 +450,49 @@ export interface ValidatedReference {
     snippet?: string;
     citationCount?: number;
     trustScore?: number;
+    status?: 'valid' | 'invalid' | 'pending';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🌍 GEO TARGET CONFIG
+// SITE CONTEXT & GENERATE CONFIG
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export interface GeoTargetConfig {
-    country: string;
-    language: string;
-    region?: string;
-    city?: string;
-    localKeywords?: string[];
-    currencySymbol?: string;
-    measurementSystem?: 'metric' | 'imperial';
+export interface SiteContext {
+    url: string;
+    orgName: string;
+    authorName: string;
+    language?: string;
+    country?: string;
+    industry?: string;
+    targetAudience?: string;
+    brandVoice?: string;
+}
+
+export interface GenerateConfig {
+    topic: string;
+    mode: OptimizationMode;
+    provider: Provider;
+    model?: string;
+    temperature?: number;
+    siteContext: SiteContext;
+    apiKeys: ApiKeys;
+    entityGapData?: EntityGapAnalysis;
+    neuronData?: NeuronAnalysisResult;
+    existingAnalysis?: ExistingContentAnalysis;
+    allFeedback?: string[];
+    targetKeyword?: string;
+    validatedReferences?: ValidatedReference[];
+    internalLinks?: InternalLinkTarget[];
+    geoConfig?: GeoTargetConfig;
+    previousAttempts?: number;
+    useStagedPipeline?: boolean;
+    useSERPGenerators?: boolean;
+    useNLPInjector?: boolean;
+    targetNLPCoverage?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📊 SERP LENGTH POLICY
+// SERP LENGTH POLICY & CONTENT OUTLINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SerpLengthPolicy {
@@ -390,10 +502,6 @@ export interface SerpLengthPolicy {
     competitorAverage?: number;
     topRankerAverage?: number;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 📝 CONTENT OUTLINE
-// ═══════════════════════════════════════════════════════════════════════════════
 
 export interface ContentOutline {
     title: string;
@@ -420,139 +528,35 @@ export interface GeneratedSection {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔄 GOD MODE TYPES
+// AUTONOMOUS CONFIG, CACHE & LOCKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type GodModePhase = 
-    | 'idle'
-    | 'initializing'
-    | 'fetching_sitemap'
-    | 'analyzing_content'
-    | 'entity_gap_analysis'
-    | 'neuron_analysis'
-    | 'reference_validation'
-    | 'content_generation'
-    | 'youtube_integration'
-    | 'nlp_injection'
-    | 'internal_linking'
-    | 'faq_upgrade'
-    | 'qa_validation'
-    | 'publishing'
-    | 'completed'
-    | 'failed';
+export interface AutonomousConfig {
+    enabled: boolean;
+    maxConcurrent: number;
+    delayBetweenJobs: number;
+    autoPublish: boolean;
+    minQualityScore: number;
+    maxRetries: number;
+    skipOnError: boolean;
+}
 
-export interface GodModeJobState {
+export interface CacheEntry<T = any> {
+    data: T;
+    timestamp: number;
+    expiresAt: number;
+    key: string;
+}
+
+export interface ProcessingLock {
     id: string;
-    targetId: string;
-    phase: GodModePhase;
-    progress: number;
-    logs: string[];
-    startTime: number;
-    endTime?: number;
-    error?: string;
-    result?: ContentContract;
+    lockedAt: number;
+    lockedBy: string;
+    expiresAt: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🏪 STORE TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export interface AppState {
-    // API Keys
-    apiKeys: ApiKeys;
-    setApiKey: (key: keyof ApiKeys, value: string) => void;
-    
-    // Site Context
-    siteContext: SiteContext;
-    setSiteContext: (ctx: Partial<SiteContext>) => void;
-    
-    // Pages
-    pages: SitemapPage[];
-    setPages: (pages: SitemapPage[]) => void;
-    updatePage: (id: string, updates: Partial<SitemapPage>) => void;
-    
-    // Job States
-    jobStates: Map<string, GodModeJobState>;
-    updateJobState: (id: string, updates: Partial<GodModeJobState>) => void;
-    
-    // UI State
-    selectedPageId: string | null;
-    setSelectedPageId: (id: string | null) => void;
-    
-    // Settings
-    settings: AppSettings;
-    updateSettings: (settings: Partial<AppSettings>) => void;
-}
-
-export interface AppSettings {
-    theme: 'light' | 'dark' | 'system';
-    defaultProvider: string;
-    defaultModel: string;
-    autoSave: boolean;
-    showAdvancedOptions: boolean;
-    maxConcurrentJobs: number;
-    enableLogging: boolean;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 📤 WORDPRESS API TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export interface WordPressCredentials {
-    siteUrl: string;
-    username: string;
-    applicationPassword: string;
-}
-
-export interface WordPressPost {
-    id?: number;
-    title: { rendered?: string; raw?: string };
-    content: { rendered?: string; raw?: string };
-    excerpt: { rendered?: string; raw?: string };
-    slug: string;
-    status: 'publish' | 'draft' | 'pending' | 'private';
-    categories?: number[];
-    tags?: number[];
-    featured_media?: number;
-    meta?: Record<string, any>;
-    yoast_head_json?: YoastMeta;
-}
-
-export interface YoastMeta {
-    title?: string;
-    description?: string;
-    robots?: {
-        index?: string;
-        follow?: string;
-    };
-    og_title?: string;
-    og_description?: string;
-    og_image?: Array<{ url: string }>;
-    schema?: any;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🎬 YOUTUBE TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export interface YouTubeVideo {
-    videoId: string;
-    title: string;
-    channel: string;
-    views: number;
-    duration: string;
-    thumbnail: string;
-    relevanceScore: number;
-}
-
-export interface YouTubeSearchResult {
-    video: YouTubeVideo | null;
-    searchQuery: string;
-    alternates: YouTubeVideo[];
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 📊 STAGE PROGRESS
+// STAGE PROGRESS & NLP TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface StageProgress {
@@ -562,10 +566,6 @@ export interface StageProgress {
     sectionsCompleted?: number;
     totalSections?: number;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🧬 NLP TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
 
 export interface NLPInjectionResult {
     html: string;
@@ -592,7 +592,7 @@ export interface NLPCoverageAnalysis {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 SERP CONTENT BLOCKS
+// SERP CONTENT BLOCKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SERPContentBlocks {
@@ -607,7 +607,7 @@ export interface SERPContentBlocks {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ✅ VALIDATION TYPES
+// VALIDATION TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface VisualValidationResult {
@@ -624,7 +624,91 @@ export interface HumanWritingValidation {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📤 DEFAULT EXPORTS
+// YOUTUBE TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface YouTubeVideo {
+    videoId: string;
+    title: string;
+    channel: string;
+    views: number;
+    duration: string;
+    thumbnail: string;
+    relevanceScore: number;
+}
+
+export interface YouTubeSearchResult {
+    video: YouTubeVideo | null;
+    searchQuery: string;
+    alternates: YouTubeVideo[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORDPRESS API TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface WordPressCredentials {
+    siteUrl: string;
+    username: string;
+    applicationPassword: string;
+}
+
+export interface YoastMeta {
+    title?: string;
+    description?: string;
+    robots?: { index?: string; follow?: string };
+    og_title?: string;
+    og_description?: string;
+    og_image?: Array<{ url: string }>;
+    schema?: any;
+}
+
+export interface WordPressPost {
+    id?: number;
+    title: { rendered?: string; raw?: string };
+    content: { rendered?: string; raw?: string };
+    excerpt: { rendered?: string; raw?: string };
+    slug: string;
+    status: 'publish' | 'draft' | 'pending' | 'private';
+    categories?: number[];
+    tags?: number[];
+    featured_media?: number;
+    meta?: Record<string, any>;
+    yoast_head_json?: YoastMeta;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STORE TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface AppSettings {
+    theme: 'light' | 'dark' | 'system';
+    defaultProvider: string;
+    defaultModel: string;
+    autoSave: boolean;
+    showAdvancedOptions: boolean;
+    maxConcurrentJobs: number;
+    enableLogging: boolean;
+}
+
+export interface AppState {
+    apiKeys: ApiKeys;
+    setApiKey: (key: keyof ApiKeys, value: string) => void;
+    siteContext: SiteContext;
+    setSiteContext: (ctx: Partial<SiteContext>) => void;
+    pages: SitemapPage[];
+    setPages: (pages: SitemapPage[]) => void;
+    updatePage: (id: string, updates: Partial<SitemapPage>) => void;
+    jobStates: Map<string, GodModeJobState>;
+    updateJobState: (id: string, updates: Partial<GodModeJobState>) => void;
+    selectedPageId: string | null;
+    setSelectedPageId: (id: string | null) => void;
+    settings: AppSettings;
+    updateSettings: (settings: Partial<AppSettings>) => void;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEFAULT EXPORT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default {
