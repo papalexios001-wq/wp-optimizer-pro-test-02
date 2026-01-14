@@ -8,7 +8,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { ContentContract, InternalLinkTarget } from './types';
-import { validateAnchorQuality, generateSemanticAnchorCandidates, injectInternalLinks } from './utils';
+import { validateAnchorQuality, generateRichAnchorCandidates, injectInternalLinks } from './utils';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHASE 1.1: SEMANTIC INTERNAL LINK FIXES
