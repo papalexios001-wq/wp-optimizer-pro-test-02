@@ -2254,24 +2254,26 @@ async function generateWithGroq(
 
 
 
-// Add this function definition somewhere in the file BEFORE it's used:
-export function buildSystemPrompt(config: {
-    ctx?: SiteContext;
+// Add this function definition in lib/ai-orchestrator.ts BEFORE line 2273:
+
+function buildSystemPrompt(config: {
+    ctx?: any;
     topic: string;
     mode: string;
-    entityGapData?: EntityGapAnalysis;
-    neuronData?: NeuronAnalysisResult;
-    existingAnalysis?: ExistingContentAnalysis;
+    entityGapData?: any;
+    neuronData?: any;
+    existingAnalysis?: any;
     allFeedback?: string[];
     targetKeyword?: string;
-    validatedReferences?: ValidatedReference[];
-    internalLinks?: InternalLinkTarget[];
-    geoConfig?: GeoTargetConfig;
+    validatedReferences?: any[];
+    internalLinks?: any[];
+    geoConfig?: any;
     attemptNumber?: number;
 }): string {
-    // Your existing implementation here
-    return ""; // placeholder
+    // Return whatever prompt building logic you need
+    return `Generate content about: ${config.topic}`;
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
