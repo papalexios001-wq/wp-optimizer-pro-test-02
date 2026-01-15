@@ -851,7 +851,7 @@ export async function discoverReferences(
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔗 INTERNAL LINK INJECTION — EVEN DISTRIBUTION
+// 🔗 INTERNAL LINK INJECTION — ENTERPRISE GRADE WITH FULL DEBUG
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function injectInternalLinksDistributed(
@@ -860,38 +860,109 @@ export function injectInternalLinksDistributed(
     currentUrl: string,
     log: LogFunction
 ): { html: string; linksAdded: InternalLinkResult[]; totalLinks: number } {
-    if (!html || !linkTargets || linkTargets.length === 0) {
+    
+    // ═══════════════════════════════════════════════════════════════
+    // DEBUG: Log all inputs
+    // ═══════════════════════════════════════════════════════════════
+    log(`   🔗 ═══════════════════════════════════════════════════════`);
+    log(`   🔗 INTERNAL LINK INJECTION — DEBUG MODE`);
+    log(`   🔗 ═══════════════════════════════════════════════════════`);
+    log(`   🔗 Input validation:`);
+    log(`      → html exists: ${!!html}`);
+    log(`      → html length: ${html?.length || 0} chars`);
+    log(`      → linkTargets exists: ${!!linkTargets}`);
+    log(`      → linkTargets type: ${typeof linkTargets}`);
+    log(`      → linkTargets is array: ${Array.isArray(linkTargets)}`);
+    log(`      → linkTargets length: ${linkTargets?.length || 0}`);
+    log(`      → currentUrl: "${currentUrl || '(empty)'}"`);
+    
+    // Validate inputs
+    if (!html) {
+        log(`   ❌ ABORT: html is empty or undefined`);
+        return { html: html || '', linksAdded: [], totalLinks: 0 };
+    }
+    
+    if (!linkTargets) {
+        log(`   ❌ ABORT: linkTargets is undefined`);
         return { html, linksAdded: [], totalLinks: 0 };
     }
+    
+    if (!Array.isArray(linkTargets)) {
+        log(`   ❌ ABORT: linkTargets is not an array (type: ${typeof linkTargets})`);
+        return { html, linksAdded: [], totalLinks: 0 };
+    }
+    
+    if (linkTargets.length === 0) {
+        log(`   ⚠️ ABORT: linkTargets array is empty`);
+        return { html, linksAdded: [], totalLinks: 0 };
+    }
+    
+    // Log first 5 link targets for debugging
+    log(`   🔗 First 5 link targets:`);
+    linkTargets.slice(0, 5).forEach((target, i) => {
+        log(`      ${i + 1}. "${target.title?.substring(0, 40) || 'NO TITLE'}..." → ${target.url?.substring(0, 50) || 'NO URL'}`);
+    });
     
     const linksAdded: InternalLinkResult[] = [];
     
-    // Filter out current URL
-    const availableTargets = linkTargets.filter(t => 
-        t.url !== currentUrl && !t.url.includes(extractSlugFromUrl(currentUrl))
-    ).slice(0, 30);
+    // Filter out current URL and limit targets
+    const availableTargets = linkTargets.filter(t => {
+        if (!t || !t.url || !t.title) {
+            log(`      ⚠️ Skipping invalid target: ${JSON.stringify(t)?.substring(0, 100)}`);
+            return false;
+        }
+        if (currentUrl && t.url === currentUrl) {
+            log(`      ⚠️ Skipping current URL: ${t.url}`);
+            return false;
+        }
+        if (currentUrl && t.url.includes(extractSlugFromUrl(currentUrl))) {
+            log(`      ⚠️ Skipping URL with current slug: ${t.url}`);
+            return false;
+        }
+        return true;
+    }).slice(0, 30);
+    
+    log(`   🔗 Available targets after filtering: ${availableTargets.length}`);
     
     if (availableTargets.length === 0) {
+        log(`   ⚠️ ABORT: No valid targets after filtering`);
         return { html, linksAdded: [], totalLinks: 0 };
     }
     
-    // Split by H2 sections
+    // ═══════════════════════════════════════════════════════════════
+    // Split content by H2 sections
+    // ═══════════════════════════════════════════════════════════════
+    
     const sectionSplitRegex = /(<h2[^>]*>)/gi;
     const parts = html.split(sectionSplitRegex);
+    
+    log(`   🔗 Content split into ${parts.length} parts`);
     
     let totalLinksAdded = 0;
     let targetIndex = 0;
     let lastLinkWordPos = 0;
     let currentWordPos = 0;
+    let sectionsProcessed = 0;
+    let paragraphsFound = 0;
+    let anchorsAttempted = 0;
+    let anchorsMatched = 0;
     
     const processedParts = parts.map((part, partIndex) => {
         // Skip H2 tags themselves and first part (intro)
-        if (part.match(/<h2/i) || partIndex === 0) {
+        if (part.match(/<h2/i)) {
             currentWordPos += countWords(part);
             return part;
         }
         
+        if (partIndex === 0) {
+            currentWordPos += countWords(part);
+            return part;
+        }
+        
+        sectionsProcessed++;
+        
         if (totalLinksAdded >= LINK_CONFIG.MAX_TOTAL) {
+            log(`      ⚠️ Section ${sectionsProcessed}: Max total links (${LINK_CONFIG.MAX_TOTAL}) reached`);
             currentWordPos += countWords(part);
             return part;
         }
@@ -899,7 +970,7 @@ export function injectInternalLinksDistributed(
         let sectionLinksAdded = 0;
         let processedPart = part;
         
-        // Find paragraphs
+        // Find paragraphs with 80+ characters (good for linking)
         const paraRegex = /<p[^>]*>([^<]{80,})<\/p>/gi;
         let match;
         const paragraphs: Array<{ full: string; text: string; pos: number }> = [];
@@ -908,10 +979,23 @@ export function injectInternalLinksDistributed(
             paragraphs.push({ full: match[0], text: match[1], pos: match.index });
         }
         
+        paragraphsFound += paragraphs.length;
+        
+        if (paragraphs.length === 0) {
+            log(`      ℹ️ Section ${sectionsProcessed}: No suitable paragraphs found`);
+        }
+        
         for (const para of paragraphs) {
-            if (sectionLinksAdded >= LINK_CONFIG.MAX_PER_SECTION) break;
-            if (totalLinksAdded >= LINK_CONFIG.MAX_TOTAL) break;
-            if (targetIndex >= availableTargets.length) break;
+            if (sectionLinksAdded >= LINK_CONFIG.MAX_PER_SECTION) {
+                break;
+            }
+            if (totalLinksAdded >= LINK_CONFIG.MAX_TOTAL) {
+                break;
+            }
+            if (targetIndex >= availableTargets.length) {
+                log(`      ⚠️ No more targets available (used ${targetIndex})`);
+                break;
+            }
             
             const paraWordPos = currentWordPos + countWords(part.substring(0, para.pos));
             
@@ -921,21 +1005,36 @@ export function injectInternalLinksDistributed(
             }
             
             const target = availableTargets[targetIndex];
-            const anchorText = findAnchorText(para.text, target);
+            anchorsAttempted++;
             
-            if (anchorText && para.text.toLowerCase().includes(anchorText.toLowerCase())) {
-                const link = `<a href="${target.url}" title="${escapeHtml(target.title)}">${anchorText}</a>`;
-                const escapedAnchor = anchorText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const anchorRegex = new RegExp(`\\b${escapedAnchor}\\b`, 'i');
-                
-                const newPara = para.full.replace(anchorRegex, link);
-                
-                if (newPara !== para.full) {
-                    processedPart = processedPart.replace(para.full, newPara);
-                    linksAdded.push({ url: target.url, anchorText, relevanceScore: 0.8, position: paraWordPos });
-                    sectionLinksAdded++;
-                    totalLinksAdded++;
-                    lastLinkWordPos = paraWordPos;
+            // Try to find anchor text
+            const anchorText = findAnchorTextWithDebug(para.text, target, log, anchorsAttempted <= 3);
+            
+            if (anchorText && anchorText.length >= 4) {
+                // Verify anchor exists in paragraph
+                if (para.text.toLowerCase().includes(anchorText.toLowerCase())) {
+                    anchorsMatched++;
+                    
+                    const link = `<a href="${escapeHtml(target.url)}" title="${escapeHtml(target.title)}">${anchorText}</a>`;
+                    const escapedAnchor = anchorText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const anchorRegex = new RegExp(`\\b${escapedAnchor}\\b`, 'i');
+                    
+                    const newPara = para.full.replace(anchorRegex, link);
+                    
+                    if (newPara !== para.full) {
+                        processedPart = processedPart.replace(para.full, newPara);
+                        linksAdded.push({ 
+                            url: target.url, 
+                            anchorText, 
+                            relevanceScore: 0.8, 
+                            position: paraWordPos 
+                        });
+                        sectionLinksAdded++;
+                        totalLinksAdded++;
+                        lastLinkWordPos = paraWordPos;
+                        
+                        log(`      ✅ Link ${totalLinksAdded}: "${anchorText}" → ${target.url.substring(0, 40)}...`);
+                    }
                 }
             }
             
@@ -946,44 +1045,116 @@ export function injectInternalLinksDistributed(
         return processedPart;
     });
     
-    log(`   ✅ ${linksAdded.length} internal links added (evenly distributed)`);
+    // ═══════════════════════════════════════════════════════════════
+    // Final summary
+    // ═══════════════════════════════════════════════════════════════
+    
+    log(`   🔗 ═══════════════════════════════════════════════════════`);
+    log(`   🔗 INTERNAL LINK INJECTION — SUMMARY`);
+    log(`   🔗 ═══════════════════════════════════════════════════════`);
+    log(`      → Sections processed: ${sectionsProcessed}`);
+    log(`      → Paragraphs found: ${paragraphsFound}`);
+    log(`      → Anchors attempted: ${anchorsAttempted}`);
+    log(`      → Anchors matched: ${anchorsMatched}`);
+    log(`      → Links injected: ${totalLinksAdded}`);
+    
+    if (totalLinksAdded === 0) {
+        log(`   ⚠️ NO LINKS WERE INJECTED!`);
+        log(`      Possible causes:`);
+        log(`      1. No matching anchor text found in content`);
+        log(`      2. Link target titles don't match content words`);
+        log(`      3. Paragraphs too short (need 80+ chars)`);
+    } else {
+        log(`   ✅ Successfully injected ${totalLinksAdded} internal links`);
+        linksAdded.forEach((link, i) => {
+            log(`      ${i + 1}. "${link.anchorText}" → ${link.url.substring(0, 50)}...`);
+        });
+    }
     
     return {
         html: processedParts.join(''),
         linksAdded,
-        totalLinks: linksAdded.length
+        totalLinks: totalLinksAdded
     };
 }
 
-function findAnchorText(text: string, target: InternalLinkTarget): string {
-    if (!text || !target?.title) return '';
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔍 ANCHOR TEXT FINDER — WITH DEBUG
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function findAnchorTextWithDebug(
+    text: string, 
+    target: InternalLinkTarget, 
+    log: LogFunction,
+    verbose: boolean = false
+): string {
+    if (!text || !target?.title) {
+        if (verbose) log(`         → findAnchor: Missing text or title`);
+        return '';
+    }
     
     const textLower = text.toLowerCase();
     const titleLower = target.title.toLowerCase();
     
-    // Stop words to NEVER use as standalone anchors
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'need', 'about', 'after', 'again', 'all', 'any', 'because', 'before', 'between', 'both', 'during', 'each', 'few', 'here', 'how', 'into', 'its', 'just', 'more', 'most', 'no', 'nor', 'not', 'now', 'off', 'once', 'only', 'other', 'our', 'out', 'over', 'own', 'same', 'so', 'some', 'such', 'than', 'that', 'their', 'them', 'then', 'there', 'these', 'they', 'this', 'those', 'through', 'too', 'under', 'until', 'up', 'very', 'what', 'when', 'where', 'which', 'while', 'who', 'why', 'your', 'best', 'top', 'guide', 'complete', 'ultimate', 'how', 'way', 'ways', 'tips', 'step', 'steps', 'make', 'get', 'use', 'using']);
+    if (verbose) {
+        log(`         → findAnchor for: "${target.title.substring(0, 40)}..."`);
+        log(`         → Paragraph preview: "${text.substring(0, 60)}..."`);
+    }
     
-    // Extract meaningful keywords from title (3+ chars, not stop words)
+    // Stop words - never use as standalone anchors
+    const stopWords = new Set([
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 
+        'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 
+        'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 
+        'may', 'might', 'must', 'can', 'need', 'about', 'after', 'again', 'all', 
+        'any', 'because', 'before', 'between', 'both', 'during', 'each', 'few', 
+        'here', 'how', 'into', 'its', 'just', 'more', 'most', 'no', 'nor', 'not', 
+        'now', 'off', 'once', 'only', 'other', 'our', 'out', 'over', 'own', 'same', 
+        'so', 'some', 'such', 'than', 'that', 'their', 'them', 'then', 'there', 
+        'these', 'they', 'this', 'those', 'through', 'too', 'under', 'until', 'up', 
+        'very', 'what', 'when', 'where', 'which', 'while', 'who', 'why', 'your', 
+        'best', 'top', 'guide', 'complete', 'ultimate', 'how', 'way', 'ways', 
+        'tips', 'step', 'steps', 'make', 'get', 'use', 'using', 'new', 'first',
+        'like', 'just', 'know', 'take', 'come', 'think', 'see', 'look', 'want',
+        'give', 'find', 'tell', 'become', 'leave', 'put', 'mean', 'keep', 'let',
+        'begin', 'seem', 'help', 'show', 'hear', 'play', 'run', 'move', 'live'
+    ]);
+    
+    // Extract meaningful keywords from title
     const titleWords = titleLower
         .replace(/[^a-z0-9\s]/g, ' ')
         .split(/\s+/)
         .filter(w => w.length >= 3 && !stopWords.has(w));
     
-    if (titleWords.length === 0) return '';
+    if (titleWords.length === 0) {
+        if (verbose) log(`         → No usable title words found`);
+        return '';
+    }
     
-    // STRATEGY 1: Find exact 2-4 word phrase from title (BEST MATCH)
+    if (verbose) {
+        log(`         → Title keywords: ${titleWords.slice(0, 5).join(', ')}`);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // STRATEGY 1: Find exact 2-4 word phrase from title (BEST)
+    // ═══════════════════════════════════════════════════════════════
+    
     for (let len = Math.min(4, titleWords.length); len >= 2; len--) {
         for (let start = 0; start <= titleWords.length - len; start++) {
             const phrase = titleWords.slice(start, start + len).join(' ');
             if (phrase.length >= 5 && phrase.length <= 40 && textLower.includes(phrase)) {
                 const idx = textLower.indexOf(phrase);
-                return text.substring(idx, idx + phrase.length);
+                const result = text.substring(idx, idx + phrase.length);
+                if (verbose) log(`         → Strategy 1 MATCH: "${result}"`);
+                return result;
             }
         }
     }
     
-    // STRATEGY 2: Find single important word (5+ chars) with one adjacent word
+    // ═══════════════════════════════════════════════════════════════
+    // STRATEGY 2: Find important word (5+ chars) with adjacent word
+    // ═══════════════════════════════════════════════════════════════
+    
     const importantWords = titleWords.filter(w => w.length >= 5);
     
     for (const word of importantWords) {
@@ -998,6 +1169,7 @@ function findAnchorText(text: string, target: InternalLinkTarget): string {
         if (afterMatch && !stopWords.has(afterMatch[1].toLowerCase())) {
             const anchor = `${actualWord} ${afterMatch[1]}`;
             if (anchor.length >= 8 && anchor.length <= 35) {
+                if (verbose) log(`         → Strategy 2a MATCH: "${anchor}"`);
                 return anchor;
             }
         }
@@ -1008,17 +1180,22 @@ function findAnchorText(text: string, target: InternalLinkTarget): string {
         if (beforeMatch && !stopWords.has(beforeMatch[1].toLowerCase())) {
             const anchor = `${beforeMatch[1]} ${actualWord}`;
             if (anchor.length >= 8 && anchor.length <= 35) {
+                if (verbose) log(`         → Strategy 2b MATCH: "${anchor}"`);
                 return anchor;
             }
         }
         
-        // Use single word if it's long enough (7+ chars)
+        // Single word if 7+ chars
         if (word.length >= 7) {
+            if (verbose) log(`         → Strategy 2c MATCH: "${actualWord}"`);
             return actualWord;
         }
     }
     
-    // STRATEGY 3: Find ANY title word (4+ chars) in text
+    // ═══════════════════════════════════════════════════════════════
+    // STRATEGY 3: Find any 4+ char title word with adjacent word
+    // ═══════════════════════════════════════════════════════════════
+    
     for (const word of titleWords) {
         if (word.length < 4) continue;
         
@@ -1027,21 +1204,27 @@ function findAnchorText(text: string, target: InternalLinkTarget): string {
         
         const actualWord = text.substring(wordIdx, wordIdx + word.length);
         
-        // Get adjacent word to make 2-word anchor
+        // Get adjacent word
         const afterText = text.substring(wordIdx + word.length, wordIdx + word.length + 25);
         const afterMatch = afterText.match(/^\s*([a-zA-Z]{3,12})/);
         if (afterMatch && !stopWords.has(afterMatch[1].toLowerCase())) {
-            return `${actualWord} ${afterMatch[1]}`;
+            const anchor = `${actualWord} ${afterMatch[1]}`;
+            if (verbose) log(`         → Strategy 3a MATCH: "${anchor}"`);
+            return anchor;
         }
         
-        // If word is 6+ chars, use it alone
+        // Single word if 6+ chars
         if (word.length >= 6) {
+            if (verbose) log(`         → Strategy 3b MATCH: "${actualWord}"`);
             return actualWord;
         }
     }
     
+    // ═══════════════════════════════════════════════════════════════
     // STRATEGY 4: Use slug-derived words
-    if (target.slug) {
+    // ═══════════════════════════════════════════════════════════════
+    
+    if (target.slug && target.slug.length > 5) {
         const slugWords = target.slug
             .replace(/-/g, ' ')
             .split(/\s+/)
@@ -1051,22 +1234,35 @@ function findAnchorText(text: string, target: InternalLinkTarget): string {
             const wordIdx = textLower.indexOf(word);
             if (wordIdx !== -1) {
                 const actualWord = text.substring(wordIdx, wordIdx + word.length);
+                
                 if (word.length >= 6) {
+                    if (verbose) log(`         → Strategy 4a MATCH: "${actualWord}"`);
                     return actualWord;
                 }
-                // Try to get adjacent word
+                
+                // Try adjacent word
                 const afterText = text.substring(wordIdx + word.length, wordIdx + word.length + 20);
                 const afterMatch = afterText.match(/^\s*([a-zA-Z]{3,10})/);
-                if (afterMatch) {
-                    return `${actualWord} ${afterMatch[1]}`;
+                if (afterMatch && !stopWords.has(afterMatch[1].toLowerCase())) {
+                    const anchor = `${actualWord} ${afterMatch[1]}`;
+                    if (verbose) log(`         → Strategy 4b MATCH: "${anchor}"`);
+                    return anchor;
                 }
             }
         }
     }
     
-    // NO FALLBACK — Return empty to prevent bad/irrelevant anchors
+    if (verbose) log(`         → No anchor match found`);
+    
+    // NO FALLBACK — Return empty to prevent bad anchors
     return '';
 }
+
+// Legacy function for compatibility
+function findAnchorText(text: string, target: InternalLinkTarget): string {
+    return findAnchorTextWithDebug(text, target, () => {}, false);
+}
+
 
 
 
@@ -1789,6 +1985,10 @@ const youtubePromise = config.apiKeys?.serper ? (async () => {
 
 Write a ${CONTENT_TARGETS.TARGET_WORDS}+ word blog post about: "${config.topic}"
 
+⚠️ CRITICAL: Do NOT include any FAQ section in htmlContent. 
+We add FAQs separately using the faqs array.
+Do NOT write "Frequently Asked Questions" or any Q&A format in the HTML.
+
 ═══════════════════════════════════════════════════════════════
 VOICE RULES (CRITICAL — THIS IS HOW HUMANS WRITE):
 ═══════════════════════════════════════════════════════════════
@@ -1899,24 +2099,24 @@ OUTPUT FORMAT (VALID JSON ONLY):
                     const quickAnswerText = `Here's the deal: ${config.topic} isn't as complicated as most people make it. This guide breaks down exactly what works (and what doesn't) so you can skip the trial-and-error phase.`;
                     contentParts.push(createQuickAnswerBox(quickAnswerText, '⚡ Quick Answer'));
                     
-                    // 3. YouTube Video — WITH VALIDATION
-log(`   🎬 YouTube check: youtubeVideo=${!!youtubeVideo}, videoId=${youtubeVideo?.videoId || 'none'}`);
+// 3. YouTube Video — WITH DETAILED DEBUG
+log(`   🎬 YouTube embed check:`);
+log(`      → youtubeVideo exists: ${!!youtubeVideo}`);
+log(`      → videoId: ${youtubeVideo?.videoId || 'MISSING'}`);
+log(`      → title: ${youtubeVideo?.title?.substring(0, 30) || 'MISSING'}`);
 
-if (youtubeVideo && youtubeVideo.videoId && youtubeVideo.videoId.length === 11) {
-    try {
-        const embedHtml = createYouTubeEmbed(youtubeVideo);
-        if (embedHtml && embedHtml.includes('iframe') && embedHtml.length > 200) {
-            contentParts.push(embedHtml);
-            log(`   ✅ YouTube EMBEDDED: "${youtubeVideo.title.substring(0, 40)}..." (${youtubeVideo.views?.toLocaleString() || 0} views)`);
-        } else {
-            log(`   ⚠️ YouTube embed HTML generation failed (html length: ${embedHtml?.length || 0})`);
-        }
-    } catch (embedError: any) {
-        log(`   ❌ YouTube embed error: ${embedError.message}`);
+if (youtubeVideo && youtubeVideo.videoId) {
+    const embedHtml = createYouTubeEmbed(youtubeVideo);
+    if (embedHtml && embedHtml.includes('iframe')) {
+        contentParts.push(embedHtml);
+        log(`   ✅ YouTube EMBEDDED successfully`);
+    } else {
+        log(`   ❌ YouTube embed HTML invalid (length: ${embedHtml?.length || 0})`);
     }
 } else {
-    log(`   ⚠️ No valid YouTube video to embed (video=${!!youtubeVideo}, videoId=${youtubeVideo?.videoId || 'missing'})`);
+    log(`   ⚠️ No YouTube video to embed`);
 }
+
 
                     
                     // 4. Statistics Box
@@ -1957,6 +2157,17 @@ mainContent = mainContent.replace(/(?:<p>\s*\d+\.\s*[^<]*\?[\s\S]*?<\/p>){3,}/gi
 
 // Pattern 7: Definition list format
 mainContent = mainContent.replace(/<dl[^>]*>[\s\S]*?(?:question|faq)[\s\S]*?<\/dl>/gi, '');
+
+// Pattern 8: Plain text Q&A format (question followed by answer paragraph)
+// This catches: "What is X?\n\nAnswer here..."
+mainContent = mainContent.replace(/(?:<p[^>]*>[^<]*\?<\/p>\s*<p[^>]*>[^<]{50,}<\/p>\s*){3,}/gi, '');
+
+// Pattern 9: Numbered list FAQ format
+mainContent = mainContent.replace(/<ol[^>]*>(?:\s*<li[^>]*>[^<]*\?[\s\S]*?<\/li>\s*){3,}<\/ol>/gi, '');
+
+// Pattern 10: Questions as bold standalone paragraphs
+mainContent = mainContent.replace(/(?:<p[^>]*>\s*<(?:strong|b|em)>[^<]*\?<\/(?:strong|b|em)>\s*<\/p>\s*<p[^>]*>[^<]+<\/p>\s*){2,}/gi, '');
+                    
 
 // Clean up any orphaned FAQ headers
 mainContent = mainContent.replace(/<h[23][^>]*>.*?(?:FAQ|Frequently Asked|Questions).*?<\/h[23]>\s*(?=<h[23]|<\/div>|$)/gi, '');
@@ -2303,24 +2514,43 @@ if (mainContent.length < originalLength) {
                     let assembledContent = contentParts.filter(Boolean).join('\n\n');
 
                     
-                    // ═══════════════════════════════════════════════════════════
-                    // STEP 4: INJECT INTERNAL LINKS
-                    // ═══════════════════════════════════════════════════════════
-                    
-                    if (config.internalLinks && config.internalLinks.length > 0) {
-                    log(`   🔗 Injecting internal links (${config.internalLinks.length} available)...`);
-                    const linkResult = injectInternalLinksDistributed(
-                    assembledContent,
-                    config.internalLinks,
-                    '',  // ← FIXED: Pass empty string, not topic!
-                    log
-                    );
+                   // ═══════════════════════════════════════════════════════════
+// STEP 4: INJECT INTERNAL LINKS — WITH DETAILED DEBUGGING
+// ═══════════════════════════════════════════════════════════
 
-                        assembledContent = linkResult.html;
-                        log(`   ✅ ${linkResult.totalLinks} internal links injected`);
-                    } else {
-                        log(`   ℹ️ No internal links provided`);
-                    }
+log(`   🔗 Internal links check:`);
+log(`      → config.internalLinks exists: ${!!config.internalLinks}`);
+log(`      → config.internalLinks length: ${config.internalLinks?.length || 0}`);
+
+if (config.internalLinks && config.internalLinks.length > 0) {
+    log(`   🔗 Injecting ${config.internalLinks.length} internal links...`);
+    log(`      → First 3 targets: ${config.internalLinks.slice(0, 3).map(l => l.title?.substring(0, 25)).join(', ')}`);
+    
+    const linkResult = injectInternalLinksDistributed(
+        assembledContent,
+        config.internalLinks,
+        '',  // Empty string - don't exclude any URLs
+        log
+    );
+    
+    assembledContent = linkResult.html;
+    
+    if (linkResult.totalLinks > 0) {
+        log(`   ✅ ${linkResult.totalLinks} internal links INJECTED successfully`);
+        log(`      → Anchors used: ${linkResult.linksAdded.map(l => l.anchorText).join(', ')}`);
+    } else {
+        log(`   ⚠️ NO internal links were injected`);
+        log(`      → This means findAnchorText returned empty for all targets`);
+        log(`      → Check if content contains words from link titles`);
+    }
+} else {
+    log(`   ⚠️ NO internal links provided to orchestrator!`);
+    log(`      → Make sure App.tsx passes internalLinks in config`);
+}
+
+                    // ═══════════════════════════════════════════════════════════
+                    // STEP 5: CREATE FINAL CONTRACT & RETURN
+                    // ═══════════════════════════════════════════════════════════
                     
                     const finalContract: ContentContract = {
                         ...rawContract,
@@ -2328,9 +2558,11 @@ if (mainContent.length < originalLength) {
                         wordCount: countWords(assembledContent)
                     };
                     
+                    log(`   📊 Final word count: ${finalContract.wordCount}`);
+                    
                     if (finalContract.wordCount >= 2000) {
-                        log(`   ✅ SUCCESS: ${finalContract.wordCount} words`);
-                        log(`   📊 YouTube=${!!youtubeVideo} | Refs=${references.length} | Links=${config.internalLinks?.length || 0}`);
+                        log(`   ✅ SUCCESS: ${finalContract.wordCount} words generated`);
+                        log(`   ⏱️ Total time: ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
                         return { 
                             contract: finalContract, 
                             generationMethod: 'single-shot', 
@@ -2339,15 +2571,20 @@ if (mainContent.length < originalLength) {
                             youtubeVideo: youtubeVideo || undefined,
                             references
                         };
+                    } else {
+                        log(`   ⚠️ Word count too low (${finalContract.wordCount}), need 2000+`);
                     }
                 }
                 
-                log(`   ⚠️ Insufficient content, retrying...`);
+                log(`   ⚠️ Attempt ${attempt} failed, content insufficient...`);
             } catch (err: any) {
-                log(`   ❌ Error: ${err.message}`);
+                log(`   ❌ Attempt ${attempt} error: ${err.message}`);
             }
             
-            if (attempt < 3) await sleep(2000 * attempt);
+            if (attempt < 3) {
+                log(`   ⏳ Waiting ${attempt * 2}s before retry...`);
+                await sleep(2000 * attempt);
+            }
         }
         
         throw new Error('Content generation failed after 3 attempts');
