@@ -1053,6 +1053,141 @@ const App: React.FC = () => {
 
             log(`✅ Phase 5 Complete: ${bestWordCount.toLocaleString()} words | Score: ${bestScore}%`);
 
+
+            // ═══════════════════════════════════════════════════════════════════════════════
+// 🎬 PHASE 5.5: YOUTUBE VIDEO INTEGRATION (After content synthesis)
+// Add this AFTER Phase 5 content synthesis and BEFORE Phase 6 publishing
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Import at the top of App.tsx
+import { 
+    searchYouTubeVideo, 
+    generateYouTubeEmbed,
+    YouTubeVideoData 
+} from './lib/youtube-service';
+
+// ... inside executeGodMode, after content synthesis succeeds:
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎬 PHASE 5.5: YOUTUBE VIDEO INTEGRATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if (store.apiKeys.serper && finalContract && finalContract.htmlContent) {
+    store.updateJobState(targetId, { phase: 'youtube_integration' as GodModePhase });
+    log(`🎬 PHASE 5.5: YouTube Video Integration...`, true);
+    
+    try {
+        // Search for a relevant, high-quality YouTube video
+        const videoResult = await searchYouTubeVideo(
+            topic,
+            store.apiKeys.serper,
+            { 
+                minViews: 10000,
+                maxAgeDays: 730, // 2 years max
+                maxResults: 10
+            },
+            (msg: string) => log(msg)
+        );
+        
+        if (videoResult.video) {
+            const video = videoResult.video;
+            
+            // Generate beautiful embed HTML
+            const videoEmbed = generateYouTubeEmbed(video, {
+                showHeader: true,
+                showStats: true,
+                lazyLoad: true
+            });
+            
+            // Find optimal insertion point
+            let insertPos = -1;
+            let insertMethod = '';
+            
+            // Option 1: After Quick Answer box
+            const quickAnswerEnd = finalContract.htmlContent.toLowerCase().indexOf('quick answer');
+            if (quickAnswerEnd > 0 && quickAnswerEnd < 1500) {
+                // Find the closing div after Quick Answer
+                const searchStart = quickAnswerEnd;
+                const searchArea = finalContract.htmlContent.substring(searchStart, searchStart + 500);
+                const closingDivs = searchArea.match(/<\/div>/gi) || [];
+                
+                if (closingDivs.length >= 2) {
+                    let divCount = 0;
+                    let pos = searchStart;
+                    while (divCount < 2 && pos < finalContract.htmlContent.length) {
+                        const nextDiv = finalContract.htmlContent.indexOf('</div>', pos);
+                        if (nextDiv === -1) break;
+                        pos = nextDiv + 6;
+                        divCount++;
+                    }
+                    if (divCount >= 2) {
+                        insertPos = pos;
+                        insertMethod = 'after Quick Answer box';
+                    }
+                }
+            }
+            
+            // Option 2: Before first H2 (but after intro)
+            if (insertPos === -1) {
+                const firstH2 = finalContract.htmlContent.indexOf('<h2');
+                if (firstH2 > 500 && firstH2 < 3000) {
+                    insertPos = firstH2;
+                    insertMethod = 'before first H2';
+                }
+            }
+            
+            // Option 3: After 3rd paragraph
+            if (insertPos === -1) {
+                let pCount = 0;
+                let searchPos = 0;
+                while (pCount < 3 && searchPos < finalContract.htmlContent.length) {
+                    const pEnd = finalContract.htmlContent.indexOf('</p>', searchPos);
+                    if (pEnd === -1) break;
+                    pCount++;
+                    searchPos = pEnd + 4;
+                }
+                if (pCount >= 3 && searchPos < 2000) {
+                    insertPos = searchPos;
+                    insertMethod = 'after 3rd paragraph';
+                }
+            }
+            
+            // Insert the video
+            if (insertPos > 0) {
+                finalContract.htmlContent = 
+                    finalContract.htmlContent.slice(0, insertPos) + 
+                    '\n\n' + videoEmbed + '\n\n' +
+                    finalContract.htmlContent.slice(insertPos);
+                
+                log(`   ✅ Video embedded: "${video.title.substring(0, 50)}..."`, true);
+                log(`   📍 Placement: ${insertMethod}`);
+                log(`   📊 ${video.channel} • ${video.views.toLocaleString()} views`);
+                log(`   🔗 https://youtube.com/watch?v=${video.videoId}`);
+                
+                // Store video data in contract for reference
+                (finalContract as any).youtubeVideo = video;
+            } else {
+                log(`   ⚠️ Could not find optimal insertion point for video`);
+            }
+        } else {
+            log(`   ⚠️ No suitable YouTube video found for this topic`);
+            
+            // Show alternative suggestion
+            if (videoResult.alternativeVideos && videoResult.alternativeVideos.length > 0) {
+                log(`   💡 ${videoResult.alternativeVideos.length} alternative videos available (lower quality)`);
+            }
+        }
+    } catch (ytError: any) {
+        log(`   ❌ YouTube integration error: ${ytError.message}`, true);
+        // Don't fail the whole job for YouTube errors
+    }
+} else if (!store.apiKeys.serper) {
+    log(`⚠️ Skipping YouTube integration (no Serper API key)`, true);
+}
+
+
+            
+
             // ═══════════════════════════════════════════════════════════════
             // PHASE 6: PUBLISH TO WORDPRESS
             // ═══════════════════════════════════════════════════════════════
