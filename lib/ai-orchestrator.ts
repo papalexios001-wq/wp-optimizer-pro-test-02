@@ -357,6 +357,155 @@ export function createFAQAccordion(faqs: Array<{ question: string; answer: strin
 </section>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎨 BEAUTIFUL VISUAL COMPONENTS (12 TOTAL)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function createStatisticsBox(stats: Array<{ value: string; label: string; icon?: string }>): string {
+    if (!stats || stats.length === 0) return '';
+    
+    const statItems = stats.map(stat => `
+        <div style="flex: 1; min-width: 140px; text-align: center; padding: 24px 16px;">
+            <div style="font-size: 14px; margin-bottom: 8px;">${stat.icon || '📊'}</div>
+            <div style="font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 6px;">${escapeHtml(stat.value)}</div>
+            <div style="font-size: 13px; opacity: 0.7; font-weight: 500;">${escapeHtml(stat.label)}</div>
+        </div>
+    `).join('');
+
+    return `
+<div class="wpo-box" style="background: linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.03) 100%); border: 2px solid rgba(99,102,241,0.12); border-radius: 24px; padding: 8px; margin: 48px 0;">
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
+        ${statItems}
+    </div>
+</div>`;
+}
+
+export function createComparisonTable(title: string, headers: [string, string], rows: Array<[string, string]>): string {
+    if (!rows || rows.length === 0) return '';
+    
+    const tableRows = rows.map((row, i) => `
+        <tr style="border-bottom: 1px solid rgba(128,128,128,0.08);">
+            <td style="padding: 16px 20px; font-weight: 500;">${escapeHtml(row[0])}</td>
+            <td style="padding: 16px 20px; background: rgba(16,185,129,0.04);">${escapeHtml(row[1])}</td>
+        </tr>
+    `).join('');
+
+    return `
+<div class="wpo-box" style="border: 1px solid rgba(128,128,128,0.12); border-radius: 20px; overflow: hidden; margin: 40px 0;">
+    <div style="padding: 20px 24px; background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%); border-bottom: 1px solid rgba(128,128,128,0.1);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">⚖️</span>
+            <h3 style="font-size: 18px; font-weight: 700; margin: 0;">${escapeHtml(title)}</h3>
+        </div>
+    </div>
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: rgba(128,128,128,0.04);">
+                <th style="padding: 14px 20px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6;">${escapeHtml(headers[0])}</th>
+                <th style="padding: 14px 20px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6;">${escapeHtml(headers[1])}</th>
+            </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+    </table>
+</div>`;
+}
+
+export function createStepByStepBox(title: string, steps: Array<{ title: string; description: string }>): string {
+    if (!steps || steps.length === 0) return '';
+    
+    const stepItems = steps.map((step, i) => `
+        <div style="display: flex; gap: 20px; ${i < steps.length - 1 ? 'padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px dashed rgba(99,102,241,0.2);' : ''}">
+            <div style="flex-shrink: 0;">
+                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 800; box-shadow: 0 8px 20px rgba(99,102,241,0.3);">${i + 1}</div>
+            </div>
+            <div style="flex: 1; padding-top: 4px;">
+                <h4 style="font-size: 17px; font-weight: 700; margin: 0 0 8px 0;">${escapeHtml(step.title)}</h4>
+                <p style="font-size: 15px; line-height: 1.7; margin: 0; opacity: 0.8;">${escapeHtml(step.description)}</p>
+            </div>
+        </div>
+    `).join('');
+
+    return `
+<div class="wpo-box" style="background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.02) 100%); border: 2px solid rgba(99,102,241,0.1); border-radius: 24px; padding: 32px; margin: 48px 0;">
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 28px;">
+        <div style="width: 52px; height: 52px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(99,102,241,0.25);">
+            <span style="font-size: 24px;">📋</span>
+        </div>
+        <h3 style="font-size: 22px; font-weight: 800; margin: 0;">${escapeHtml(title)}</h3>
+    </div>
+    ${stepItems}
+</div>`;
+}
+
+export function createHighlightBox(text: string, icon: string = '✨', bgColor: string = '#6366f1'): string {
+    return `
+<div class="wpo-box" style="background: linear-gradient(135deg, ${bgColor} 0%, ${bgColor}dd 100%); border-radius: 20px; padding: 28px 32px; margin: 40px 0; color: white; box-shadow: 0 16px 40px ${bgColor}40;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <span style="font-size: 32px; flex-shrink: 0;">${icon}</span>
+        <p style="font-size: 18px; line-height: 1.7; margin: 0; font-weight: 500;">${text}</p>
+    </div>
+</div>`;
+}
+
+export function createChecklistBox(title: string, items: string[], icon: string = '✅'): string {
+    if (!items || items.length === 0) return '';
+    
+    const checkItems = items.map(item => `
+        <li style="display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(16,185,129,0.1);">
+            <span style="font-size: 18px; flex-shrink: 0; margin-top: 2px;">${icon}</span>
+            <span style="font-size: 15px; line-height: 1.6;">${escapeHtml(item)}</span>
+        </li>
+    `).join('');
+
+    return `
+<div class="wpo-box" style="background: linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(34,197,94,0.02) 100%); border: 2px solid rgba(16,185,129,0.15); border-radius: 20px; padding: 28px; margin: 40px 0;">
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(16,185,129,0.25);">
+            <span style="font-size: 22px;">📝</span>
+        </div>
+        <h3 style="font-size: 20px; font-weight: 800; margin: 0;">${escapeHtml(title)}</h3>
+    </div>
+    <ul style="list-style: none; padding: 0; margin: 0;">${checkItems}</ul>
+</div>`;
+}
+
+export function createDefinitionBox(term: string, definition: string): string {
+    return `
+<div class="wpo-box" style="background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(37,99,235,0.02) 100%); border-left: 5px solid #3b82f6; border-radius: 0 16px 16px 0; padding: 24px 28px; margin: 36px 0;">
+    <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 20px;">📖</span>
+        </div>
+        <div>
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; margin-bottom: 6px;">Definition</div>
+            <h4 style="font-size: 18px; font-weight: 700; margin: 0 0 10px 0;">${escapeHtml(term)}</h4>
+            <p style="font-size: 15px; line-height: 1.7; margin: 0; opacity: 0.85;">${definition}</p>
+        </div>
+    </div>
+</div>`;
+}
+
+export function createCalloutBox(text: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): string {
+    const configs = {
+        info: { bg: 'rgba(59,130,246,0.08)', border: '#3b82f6', icon: 'ℹ️', label: 'Info' },
+        success: { bg: 'rgba(16,185,129,0.08)', border: '#10b981', icon: '✅', label: 'Success' },
+        warning: { bg: 'rgba(245,158,11,0.08)', border: '#f59e0b', icon: '⚠️', label: 'Warning' },
+        error: { bg: 'rgba(239,68,68,0.08)', border: '#ef4444', icon: '🚫', label: 'Important' }
+    };
+    const c = configs[type];
+    
+    return `
+<div class="wpo-box" style="background: ${c.bg}; border: 1px solid ${c.border}30; border-left: 4px solid ${c.border}; border-radius: 0 16px 16px 0; padding: 20px 24px; margin: 32px 0;">
+    <div style="display: flex; align-items: flex-start; gap: 14px;">
+        <span style="font-size: 22px; flex-shrink: 0;">${c.icon}</span>
+        <div>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: ${c.border}; margin-bottom: 6px;">${c.label}</div>
+            <p style="font-size: 15px; line-height: 1.7; margin: 0;">${text}</p>
+        </div>
+    </div>
+</div>`;
+}
+
 
 export function createReferencesSection(references: DiscoveredReference[]): string {
     if (!references || references.length === 0) return '';
@@ -1436,13 +1585,13 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
     
     async generateSingleShot(config: GenerateConfig, log: LogFunction): Promise<GenerationResult> {
         const startTime = Date.now();
-        log(`🎨 SINGLE-SHOT GENERATION (ENTERPRISE MODE)`);
+        log(`🎨 SINGLE-SHOT GENERATION (FULL ENTERPRISE MODE)`);
         
         let youtubeVideo: YouTubeVideoData | null = null;
         let references: DiscoveredReference[] = [];
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 1: PARALLEL DISCOVERY — YouTube + References
+        // STEP 1: PARALLEL — YouTube + References
         // ═══════════════════════════════════════════════════════════════
         
         log(`   🔍 Starting parallel discovery...`);
@@ -1457,7 +1606,7 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
                     log(`   ⚠️ No suitable YouTube video found`);
                 }
             } catch (e: any) {
-                log(`   ⚠️ YouTube search error: ${e.message}`);
+                log(`   ⚠️ YouTube error: ${e.message}`);
             }
         })() : Promise.resolve();
         
@@ -1480,7 +1629,7 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
                     log(`   ✅ Discovered ${references.length} references`);
                 }
             } catch (e: any) {
-                log(`   ⚠️ Reference discovery error: ${e.message}`);
+                log(`   ⚠️ Reference error: ${e.message}`);
             }
         })() : Promise.resolve();
         
@@ -1488,51 +1637,80 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
         // STEP 2: HUMAN-STYLE CONTENT GENERATION
         // ═══════════════════════════════════════════════════════════════
         
-        const humanPrompt = `You're a world-class blogger who writes like Alex Hormozi meets Tim Ferriss. Your content is punchy, practical, and impossible to detect as AI.
+        const humanPrompt = `You're a world-class content writer who sounds like Alex Hormozi, Tim Ferriss, and Seth Godin combined. Your writing is punchy, personal, and impossible to detect as AI.
 
 Write a ${CONTENT_TARGETS.TARGET_WORDS}+ word blog post about: "${config.topic}"
 
-VOICE RULES (CRITICAL):
-• Write like you're texting a smart friend — casual but valuable
-• Use "you" and "your" in almost every paragraph
-• Contractions ALWAYS: don't, won't, can't, you'll, here's, that's
-• Start sentences with: Look, Here's the thing, And, But, So, Now, Plus, Oh, 
-• Mix punchy 3-word sentences with longer ones
-• One idea per sentence. Period.
-• 2-3 sentences per paragraph MAX
-• Single sentence paragraphs for emphasis
+═══════════════════════════════════════════════════════════════
+VOICE & TONE RULES (CRITICAL — FOLLOW EXACTLY):
+═══════════════════════════════════════════════════════════════
 
-ABSOLUTELY FORBIDDEN (instant AI detection):
-• "In today's [anything]" / "In the [adjective] world"
-• "It's important to note" / "It's worth mentioning" / "It should be noted"
-• "This comprehensive guide" / "This article will"
+1. SOUND HUMAN:
+   • Write like you're texting a smart friend
+   • Use "you" and "your" in almost every paragraph
+   • Use contractions ALWAYS: don't, won't, can't, you'll, here's, that's, it's
+   • Be opinionated — take a stance, don't hedge
+   • Share "secrets" and insider knowledge
+
+2. SENTENCE STRUCTURE:
+   • Start sentences with: Look, Here's the thing, And, But, So, Now, Plus, Oh, Honestly, Real talk
+   • Mix ultra-short sentences (3-5 words) with medium ones
+   • NEVER write sentences over 20 words
+   • Use fragments for emphasis. Like this. Works great.
+
+3. PARAGRAPH RULES:
+   • 1-3 sentences MAX per paragraph
+   • Single sentence paragraphs for punch
+   • White space is your friend — lots of it
+
+4. ENGAGEMENT HOOKS:
+   • Ask rhetorical questions
+   • Use "imagine this..." scenarios
+   • Include specific numbers and examples
+   • Create "aha moments" with unexpected insights
+
+═══════════════════════════════════════════════════════════════
+ABSOLUTELY FORBIDDEN (INSTANT AI DETECTION):
+═══════════════════════════════════════════════════════════════
+
+NEVER use these phrases:
+• "In today's [anything]" / "In this digital age"
+• "It's important to note" / "It's worth mentioning"
+• "This comprehensive guide" / "This article will explore"
 • "Let's dive in" / "Without further ado" / "Let's get started"
 • "Leverage" / "Utilize" / "Facilitate" / "Delve" / "Realm"
-• "Navigate" / "Landscape" / "Paradigm" / "Multifaceted"
+• "Navigate the landscape" / "Paradigm shift" / "Multifaceted"
 • "Game-changer" / "Revolutionary" / "Cutting-edge" / "Robust"
 • "In conclusion" / "To summarize" / "In summary" / "To sum up"
-• "Key takeaways" at the end (we add this separately)
-• Starting ANY sentence with "This" followed by a linking verb
+• "First and foremost" / "Last but not least"
+• Starting ANY sentence with "This" followed by "is" or "means"
+• "Whether you're a beginner or expert"
 
+═══════════════════════════════════════════════════════════════
 STRUCTURE:
+═══════════════════════════════════════════════════════════════
+
 • 8-12 H2 sections, each with 2-3 H3 subsections
 • NO H1 tags — WordPress handles the title
-• Bullet points and numbered lists where natural
-• Real examples with specific numbers when possible
-• FAQ section: 8-10 questions with 80-150 word answers each
+• Start with a killer hook (story, stat, or provocative statement)
+• Include bullets and numbered lists where natural
+• FAQ section: 8-10 real questions with 80-150 word answers each
 
-OUTPUT: Valid JSON only:
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT (VALID JSON ONLY):
+═══════════════════════════════════════════════════════════════
+
 {
-  "title": "Curiosity-inducing title (50-60 chars, no clickbait)",
+  "title": "Curiosity-inducing title (50-60 chars)",
   "metaDescription": "Compelling meta description (150-160 chars)",
   "slug": "url-friendly-slug",
-  "htmlContent": "Full HTML content starting with a hook paragraph",
+  "htmlContent": "Full HTML content starting with hook paragraph",
   "excerpt": "2-3 sentence compelling summary",
-  "faqs": [{"question": "Real question people ask", "answer": "Detailed 80-150 word answer"}],
+  "faqs": [{"question": "Real question", "answer": "Detailed 80-150 word answer"}],
   "wordCount": number
 }
 
-Return ONLY valid JSON. No markdown. No explanation.`;
+⚠️ Return ONLY valid JSON. No markdown. No explanation.`;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             log(`   📝 Content attempt ${attempt}/3...`);
@@ -1540,7 +1718,7 @@ Return ONLY valid JSON. No markdown. No explanation.`;
             try {
                 const response = await callLLM(
                     config.provider, config.apiKeys, config.model, humanPrompt,
-                    'You are an elite content creator. Your writing is indistinguishable from top human bloggers. Never sound robotic or formal.',
+                    'You are an elite content creator. Your writing is indistinguishable from top human bloggers. Never sound formal or robotic.',
                     { temperature: 0.78 + (attempt - 1) * 0.04, maxTokens: 16000 },
                     TIMEOUTS.SINGLE_SHOT, log
                 );
@@ -1550,27 +1728,27 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                 if (parsed.success && parsed.data?.htmlContent) {
                     let rawContract = parsed.data as ContentContract;
                     
-                    // Wait for parallel discovery to complete
+                    // Wait for parallel tasks
                     log(`   ⏳ Waiting for YouTube & References...`);
                     await Promise.all([youtubePromise, referencesPromise]);
                     
                     // ═══════════════════════════════════════════════════════════
-                    // STEP 3: ASSEMBLE WITH ALL VISUAL COMPONENTS
+                    // STEP 3: ASSEMBLE WITH 12+ VISUAL COMPONENTS
                     // ═══════════════════════════════════════════════════════════
                     
-                    log(`   🎨 Assembling with visual components...`);
+                    log(`   🎨 Assembling with 12+ visual components...`);
                     
                     const contentParts: string[] = [];
                     
-                    // 1. Theme-Adaptive CSS
+                    // 1. CSS
                     contentParts.push(THEME_ADAPTIVE_CSS);
                     contentParts.push('<div class="wpo-content">');
                     
                     // 2. Quick Answer Box
-                    const quickAnswerText = `Here's the deal: ${config.topic} isn't as complicated as most people make it. This guide breaks down exactly what works (and what doesn't) so you can skip the trial-and-error phase and get results fast.`;
+                    const quickAnswerText = `Here's the deal: ${config.topic} isn't as complicated as most people make it. This guide breaks down exactly what works (and what doesn't) so you can skip the trial-and-error phase.`;
                     contentParts.push(createQuickAnswerBox(quickAnswerText, '⚡ Quick Answer'));
                     
-                    // 3. YouTube Video (if found)
+                    // 3. YouTube Video
                     if (youtubeVideo) {
                         contentParts.push(createYouTubeEmbed(youtubeVideo));
                         log(`   ✅ YouTube embedded: "${youtubeVideo.title.substring(0, 35)}..."`);
@@ -1578,7 +1756,14 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                         log(`   ℹ️ No YouTube video to embed`);
                     }
                     
-                    // 4. Main Content with Visual Enhancements
+                    // 4. Statistics Box
+                    contentParts.push(createStatisticsBox([
+                        { value: '73%', label: 'Success Rate Increase', icon: '📈' },
+                        { value: '2.5x', label: 'Faster Results', icon: '⚡' },
+                        { value: '10K+', label: 'People Helped', icon: '👥' }
+                    ]));
+                    
+                    // 5. Main Content with Visual Enhancements
                     let mainContent = rawContract.htmlContent;
                     mainContent = removeAllH1Tags(mainContent, log);
                     
@@ -1586,10 +1771,10 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                     
                     if (h2Matches.length > 0) {
                         const proTips = [
-                            `Here's what nobody tells you: the first 30 days are the hardest. Push through that initial resistance and everything gets easier. Most people quit at day 21.`,
-                            `Stop trying to be perfect. Seriously. Done beats perfect every single time. Ship fast, learn faster, iterate constantly.`,
-                            `The secret sauce? Consistency beats intensity. Showing up every day for 30 minutes beats a 10-hour weekend marathon.`,
-                            `Track everything. What gets measured gets improved. Set up your tracking system before you do anything else.`
+                            `Here's what nobody tells you: the first 30 days are the hardest. Push through that resistance and everything changes.`,
+                            `Stop trying to be perfect. Done beats perfect every single time. Ship fast, learn faster.`,
+                            `The secret? Consistency beats intensity. Daily 30-minute sessions beat weekend marathons.`,
+                            `Track everything. What gets measured gets improved. Period.`
                         ];
                         
                         let tipIndex = 0;
@@ -1597,18 +1782,37 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                         h2Matches.forEach((match, index) => {
                             contentParts.push(match[0]);
                             
-                            // Pro Tip after sections 3, 6, 9
+                            // Pro Tip after sections 2, 5, 8
                             if ((index + 1) % 3 === 0 && tipIndex < proTips.length) {
                                 contentParts.push(createProTipBox(proTips[tipIndex], '💡 Pro Tip'));
                                 tipIndex++;
                             }
                             
+                            // Highlight Box after section 2
+                            if (index === 1) {
+                                contentParts.push(createHighlightBox(
+                                    `Most people fail not because they lack knowledge — they fail because they don't take action. Don't be most people.`,
+                                    '🎯', '#6366f1'
+                                ));
+                            }
+                            
                             // Warning after section 4
                             if (index === 3) {
                                 contentParts.push(createWarningBox(
-                                    `Biggest mistake I see? Trying to do everything at once. Pick ONE thing from this section, nail it completely, then move to the next. Stack skills, don't scatter them.`,
+                                    `Biggest mistake? Trying to do everything at once. Pick ONE thing from this section, nail it, then move on. Stack skills, don't scatter them.`,
                                     '⚠️ Don\'t Skip This'
                                 ));
+                            }
+                            
+                            // Checklist after section 5
+                            if (index === 4) {
+                                contentParts.push(createChecklistBox('Quick Action Items', [
+                                    'Implement the first strategy today (not tomorrow)',
+                                    'Set up tracking to measure your progress',
+                                    'Block 30 minutes daily for focused practice',
+                                    'Find an accountability partner or community',
+                                    'Review and adjust weekly based on results'
+                                ]));
                             }
                             
                             // Expert Quote after section 6
@@ -1616,38 +1820,81 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                                 contentParts.push(createExpertQuoteBox(
                                     `The bottleneck is never resources. It's resourcefulness. Stop waiting for perfect conditions — they don't exist.`,
                                     'Tony Robbins',
-                                    'Peak Performance Coach'
+                                    'Peak Performance Expert'
+                                ));
+                            }
+                            
+                            // Step-by-step after section 7
+                            if (index === 6) {
+                                contentParts.push(createStepByStepBox('Your Next 7 Days', [
+                                    { title: 'Day 1-2: Foundation', description: 'Set up your environment and remove distractions. Get crystal clear on your goal.' },
+                                    { title: 'Day 3-4: First Action', description: 'Implement the core strategy. Don\'t overthink — just start.' },
+                                    { title: 'Day 5-6: Iterate', description: 'Review what\'s working, cut what isn\'t. Double down on winners.' },
+                                    { title: 'Day 7: Scale', description: 'Add the next layer. Build momentum with your early wins.' }
+                                ]));
+                            }
+                            
+                            // Callout after section 8
+                            if (index === 7) {
+                                contentParts.push(createCalloutBox(
+                                    `Remember: You don't need to be great to start, but you need to start to be great. The best time to begin was yesterday. The second best time is right now.`,
+                                    'info'
                                 ));
                             }
                         });
                     } else {
                         contentParts.push(mainContent);
-                        contentParts.push(createProTipBox(`Knowledge without action is just entertainment. Pick one thing from this guide and do it today. Not tomorrow. Today.`, '💡 Take Action'));
+                        contentParts.push(createProTipBox(`Knowledge without action is just entertainment. Pick one thing from this guide and do it today.`, '💡 Take Action'));
                     }
                     
-                    // 5. Key Takeaways
+                    // 6. Definition Box
+                    contentParts.push(createDefinitionBox(
+                        config.topic,
+                        `The systematic approach to achieving measurable results through proven strategies, consistent execution, and continuous optimization. It's not about working harder — it's about working smarter with the right framework.`
+                    ));
+                    
+                    // 7. Comparison Table
+                    contentParts.push(createComparisonTable(
+                        'What Works vs What Doesn\'t',
+                        ['❌ Common Mistakes', '✅ What Actually Works'],
+                        [
+                            ['Trying to do everything at once', 'Focus on one thing until mastery'],
+                            ['Copying others blindly', 'Adapting strategies to your situation'],
+                            ['Giving up after first failure', 'Treating failures as data points'],
+                            ['Waiting for perfect conditions', 'Starting messy and iterating'],
+                            ['Going it alone', 'Learning from those who\'ve done it']
+                        ]
+                    ));
+                    
+                    // 8. Key Takeaways
                     const keyTakeaways = [
                         `${config.topic} isn't complicated — but it does require consistent action`,
                         `Focus on the 20% that drives 80% of results (ignore the rest)`,
                         `Track your progress weekly — what gets measured gets improved`,
                         `Start messy, iterate fast — perfectionism is procrastination in disguise`,
-                        `Find someone who's done it and model their process exactly`
+                        `Find someone who's done it and model their exact process`
                     ];
                     contentParts.push(createKeyTakeaways(keyTakeaways));
                     
-                    // 6. FAQ Accordion
+                    // 9. FAQ Accordion
                     if (rawContract.faqs && rawContract.faqs.length > 0) {
                         contentParts.push(createFAQAccordion(rawContract.faqs));
                         log(`   ✅ FAQ: ${rawContract.faqs.length} questions`);
                     }
                     
-                    // 7. References Section
+                    // 10. References Section
                     if (references.length > 0) {
                         contentParts.push(createReferencesSection(references));
                         log(`   ✅ References: ${references.length} sources`);
                     }
                     
-                    // 8. Close wrapper
+                    // 11. Final CTA Highlight
+                    contentParts.push(createHighlightBox(
+                        `You now have everything you need. The only question is: will you take action? Start with step 1 today. Not tomorrow. Today.`,
+                        '🚀', '#10b981'
+                    ));
+                    
+                    // Close wrapper
                     contentParts.push('</div>');
                     
                     // Assemble content
@@ -1668,7 +1915,7 @@ Return ONLY valid JSON. No markdown. No explanation.`;
                         assembledContent = linkResult.html;
                         log(`   ✅ ${linkResult.totalLinks} internal links injected`);
                     } else {
-                        log(`   ℹ️ No internal links to inject`);
+                        log(`   ℹ️ No internal links provided`);
                     }
                     
                     const finalContract: ContentContract = {
