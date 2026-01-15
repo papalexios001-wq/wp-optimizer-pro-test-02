@@ -1339,13 +1339,13 @@ Return ONLY valid JSON.`;
             
 const youtubePromise = config.apiKeys?.serper ? (async () => {
     try {
-        log(`   🎬 Searching YouTube for: "${config.topic.substring(0, 40)}..."`);
-        const video = await searchYouTubeVideo(config.topic, config.apiKeys.serper, log);
-        if (video && video.videoId) {
-            youtubeVideo = video;
-            log(`   ✅ YouTube FOUND: "${video.title.substring(0, 40)}..." (${video.views.toLocaleString()} views)`);
+        log(`   🎬 Searching YouTube for: "${config.topic.substring(0, 50)}..."`);
+        const foundVideo = await searchYouTubeVideo(config.topic, config.apiKeys.serper, log);
+        if (foundVideo && foundVideo.videoId) {
+            youtubeVideo = foundVideo;
+            log(`   ✅ YouTube FOUND: "${foundVideo.title.substring(0, 40)}..." (${foundVideo.views?.toLocaleString() || 0} views)`);
         } else {
-            log(`   ⚠️ YouTube search returned no valid results`);
+            log(`   ⚠️ YouTube search returned no valid video`);
             youtubeVideo = null;
         }
     } catch (e: any) {
@@ -1353,6 +1353,7 @@ const youtubePromise = config.apiKeys?.serper ? (async () => {
         youtubeVideo = null;
     }
 })() : Promise.resolve();
+
 
             
             // ═══════════════════════════════════════════════════════════════
@@ -1690,19 +1691,24 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
         
         log(`   🔍 Starting parallel discovery...`);
         
-        const youtubePromise = config.apiKeys?.serper ? (async () => {
-            try {
-                log(`   🎬 Searching YouTube...`);
-                youtubeVideo = await searchYouTubeVideo(config.topic, config.apiKeys.serper, log);
-                if (youtubeVideo) {
-                    log(`   ✅ YouTube: "${youtubeVideo.title.substring(0, 40)}..."`);
-                } else {
-                    log(`   ⚠️ No suitable YouTube video found`);
-                }
-            } catch (e: any) {
-                log(`   ⚠️ YouTube error: ${e.message}`);
-            }
-        })() : Promise.resolve();
+const youtubePromise = config.apiKeys?.serper ? (async () => {
+    try {
+        log(`   🎬 Searching YouTube for: "${config.topic.substring(0, 50)}..."`);
+        const foundVideo = await searchYouTubeVideo(config.topic, config.apiKeys.serper, log);
+        
+        if (foundVideo && foundVideo.videoId && foundVideo.videoId.length === 11) {
+            youtubeVideo = foundVideo;
+            log(`   ✅ YouTube FOUND: "${foundVideo.title.substring(0, 40)}..." (ID: ${foundVideo.videoId}, ${foundVideo.views?.toLocaleString() || 0} views)`);
+        } else {
+            youtubeVideo = null;
+            log(`   ⚠️ YouTube search returned no valid video (result=${!!foundVideo}, videoId=${foundVideo?.videoId || 'missing'})`);
+        }
+    } catch (e: any) {
+        youtubeVideo = null;
+        log(`   ❌ YouTube search FAILED: ${e.message}`);
+    }
+})() : Promise.resolve();
+
         
         const referencesPromise = config.apiKeys?.serper ? (async () => {
             try {
@@ -1845,13 +1851,25 @@ OUTPUT FORMAT (VALID JSON ONLY):
                     const quickAnswerText = `Here's the deal: ${config.topic} isn't as complicated as most people make it. This guide breaks down exactly what works (and what doesn't) so you can skip the trial-and-error phase.`;
                     contentParts.push(createQuickAnswerBox(quickAnswerText, '⚡ Quick Answer'));
                     
-                    // 3. YouTube Video
-                    if (youtubeVideo) {
-                        contentParts.push(createYouTubeEmbed(youtubeVideo));
-                        log(`   ✅ YouTube embedded: "${youtubeVideo.title.substring(0, 35)}..."`);
-                    } else {
-                        log(`   ℹ️ No YouTube video to embed`);
-                    }
+                    // 3. YouTube Video — WITH VALIDATION
+log(`   🎬 YouTube check: youtubeVideo=${!!youtubeVideo}, videoId=${youtubeVideo?.videoId || 'none'}`);
+
+if (youtubeVideo && youtubeVideo.videoId && youtubeVideo.videoId.length === 11) {
+    try {
+        const embedHtml = createYouTubeEmbed(youtubeVideo);
+        if (embedHtml && embedHtml.includes('iframe') && embedHtml.length > 200) {
+            contentParts.push(embedHtml);
+            log(`   ✅ YouTube EMBEDDED: "${youtubeVideo.title.substring(0, 40)}..." (${youtubeVideo.views?.toLocaleString() || 0} views)`);
+        } else {
+            log(`   ⚠️ YouTube embed HTML generation failed (html length: ${embedHtml?.length || 0})`);
+        }
+    } catch (embedError: any) {
+        log(`   ❌ YouTube embed error: ${embedError.message}`);
+    }
+} else {
+    log(`   ⚠️ No valid YouTube video to embed (video=${!!youtubeVideo}, videoId=${youtubeVideo?.videoId || 'missing'})`);
+}
+
                     
                     // 4. Statistics Box
                     contentParts.push(createStatisticsBox([
@@ -1860,14 +1878,50 @@ OUTPUT FORMAT (VALID JSON ONLY):
                         { value: '10K+', label: 'People Helped', icon: '👥' }
                     ]));
                     
-// 5. Main Content with Visual Enhancements
+// 5. Main Content with Visual Enhancements — STRIP ALL FAQ FORMATS
 let mainContent = rawContract.htmlContent;
 mainContent = removeAllH1Tags(mainContent, log);
 
-// CRITICAL: Strip FAQ section from LLM output (we add our own accordion later)
-mainContent = mainContent.replace(/<h2[^>]*>.*?(?:FAQ|Frequently Asked|Common Questions).*?<\/h2>[\s\S]*?(?=<h2|$)/gi, '');
-mainContent = mainContent.replace(/<section[^>]*itemtype[^>]*FAQPage[^>]*>[\s\S]*?<\/section>/gi, '');
-log(`   🧹 Stripped duplicate FAQ from LLM output`);
+// ═══════════════════════════════════════════════════════════════
+// 🧹 CRITICAL: Strip ALL FAQ content from LLM output
+// The LLM often includes FAQs in htmlContent, but we add our own accordion
+// ═══════════════════════════════════════════════════════════════
+
+const originalLength = mainContent.length;
+
+// Pattern 1: H2 FAQ sections (most common)
+mainContent = mainContent.replace(/<h2[^>]*>.*?(?:FAQ|Frequently Asked|Common Questions|Questions & Answers|Q\s*&\s*A).*?<\/h2>[\s\S]*?(?=<h2[^>]*>|$)/gi, '');
+
+// Pattern 2: H3 FAQ sections
+mainContent = mainContent.replace(/<h3[^>]*>.*?(?:FAQ|Frequently Asked).*?<\/h3>[\s\S]*?(?=<h[23][^>]*>|$)/gi, '');
+
+// Pattern 3: Section with FAQ schema markup
+mainContent = mainContent.replace(/<section[^>]*(?:itemtype[^>]*FAQPage|class="[^"]*faq)[^>]*>[\s\S]*?<\/section>/gi, '');
+
+// Pattern 4: Div with FAQ class
+mainContent = mainContent.replace(/<div[^>]*class="[^"]*(?:faq|questions)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+
+// Pattern 5: Bold question + answer format (Q: ... A: ...)
+mainContent = mainContent.replace(/(?:<p>\s*<(?:strong|b)>[^<]*\?<\/(?:strong|b)>\s*<\/p>\s*<p>[^<]+<\/p>\s*){2,}/gi, '');
+
+// Pattern 6: Numbered question list format
+mainContent = mainContent.replace(/(?:<p>\s*\d+\.\s*[^<]*\?[\s\S]*?<\/p>){3,}/gi, '');
+
+// Pattern 7: Definition list format
+mainContent = mainContent.replace(/<dl[^>]*>[\s\S]*?(?:question|faq)[\s\S]*?<\/dl>/gi, '');
+
+// Clean up any orphaned FAQ headers
+mainContent = mainContent.replace(/<h[23][^>]*>.*?(?:FAQ|Frequently Asked|Questions).*?<\/h[23]>\s*(?=<h[23]|<\/div>|$)/gi, '');
+
+// Clean up multiple blank lines
+mainContent = mainContent.replace(/\n{4,}/g, '\n\n');
+
+if (mainContent.length < originalLength) {
+    log(`   🧹 Stripped ${originalLength - mainContent.length} chars of duplicate FAQ content from LLM output`);
+} else {
+    log(`   ✓ No duplicate FAQ content found in LLM output`);
+}
+
 
                     
                     const h2Matches = [...mainContent.matchAll(/<h2[^>]*>[\s\S]*?(?=<h2|$)/gi)];
