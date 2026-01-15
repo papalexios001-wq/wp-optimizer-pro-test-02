@@ -1,24 +1,21 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// WP OPTIMIZER PRO v23.3 — ULTRA ENTERPRISE EDITION (ALL CRITICAL FIXES)
+// WP OPTIMIZER PRO v27.0 — ENTERPRISE SOTA EDITION (COMPLETE REFACTOR)
 // ═══════════════════════════════════════════════════════════════════════════════
-// CRITICAL FIXES v23.3:
-// • 🔥 IMMER FREEZE FIX — Deep copy contracts before state updates
-// • ZERO H1 DUPLICATION — WordPress provides H1, content NEVER includes H1
-// • SLUG PRESERVATION — Never changes URL for existing posts
-// • FEATURED IMAGE PRESERVATION — Never deletes existing featured images
-// • CONTENT IMAGE PRESERVATION — All images maintained with optimized alt text
-// • DUAL OPTIMIZATION MODES — Full Rewrite OR Surgical Improvements
-// • CATEGORY/TAG PRESERVATION — Original taxonomies maintained
-// • FAQ DUPLICATION FIX — Premium FAQ only added once
-// • Q&A CLEANUP — Removes Q&A format from main content
-// • CONTENT STRUCTURE VALIDATION — Detects Q&A-heavy content
-// • Strict 3-5 word anchor text enforcement
-// • 25-minute job timeout for bulk operations
-// • Premium visual component generation
-// • 35+ QA validation checks
-// • NLP coverage tracking (70%+ target)
+// 
+// CRITICAL FIXES v27.0:
+// ✅ STAGED PIPELINE INTEGRATION — Uses new chunked generation
+// ✅ IMMER FREEZE FIX — Deep clone contracts before state updates
+// ✅ ZERO H1 DUPLICATION — WordPress provides H1, content NEVER includes H1
+// ✅ CANCELLATION SYSTEM — Cancel long-running jobs gracefully
+// ✅ CIRCUIT BREAKER AWARE — Respects provider circuit breakers
+// ✅ PROGRESS TRACKING — Real-time stage progress updates
+// ✅ IMPROVED ERROR HANDLING — Better error messages and recovery
+// ✅ BULK OPTIMIZATION — Parallel processing with concurrency control
+// ✅ SLUG PRESERVATION — Never changes URL for existing posts
+// ✅ FEATURED IMAGE PRESERVATION — Never deletes existing featured images
+// ✅ CONTENT IMAGE PRESERVATION — All images maintained with optimized alt text
+// ✅ FAQ DUPLICATION FIX — Premium FAQ only added once
 // ═══════════════════════════════════════════════════════════════════════════════
-
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from './store';
@@ -46,306 +43,74 @@ import {
     formatDuration as formatDurationUI
 } from './components';
 import { 
-    SitemapPage, ContentContract, GodModePhase, InternalLinkTarget,
-    GeoTargetConfig, APP_VERSION, NeuronTerm, OptimizationMode
+    SitemapPage, 
+    ContentContract, 
+    GodModePhase, 
+    InternalLinkTarget,
+    GeoTargetConfig, 
+    APP_VERSION, 
+    NeuronTerm, 
+    OptimizationMode,
+    StageProgress,
+    BulkJob,
+    BulkProcessingState,
+    BulkResult,
+    PostPreservationData
 } from './types';
 import { 
-    extractSlugFromUrl, sanitizeTitle, calculateOpportunityScore, 
-    calculateSeoMetrics, sanitizeSlug, runQASwarm, injectInternalLinks,
-    analyzeExistingContent, formatDuration, removeAllH1Tags, validateNoH1
+    extractSlugFromUrl, 
+    sanitizeTitle, 
+    calculateOpportunityScore, 
+    calculateSeoMetrics, 
+    sanitizeSlug, 
+    runQASwarm, 
+    injectInternalLinks,
+    analyzeExistingContent, 
+    formatDuration, 
+    removeAllH1Tags, 
+    validateNoH1
 } from './utils';
 import { 
-    titanFetch, wpResolvePostIdEnhanced, wpUpdatePost, wpCreatePost, 
-    wpGetPost, wpTestConnection, performEntityGapAnalysis,
-    discoverAndValidateReferences, wpUpdatePostMeta,
-    wpGetPostWithImages, wpGetFeaturedImage, extractImagesFromContent,
-    wpUpdateMediaAltText, wpGetMediaIdFromUrl, wpGetPostFullUrl,
-    FeaturedImageData, discoverInternalLinkTargets
+    titanFetch, 
+    wpResolvePostIdEnhanced, 
+    wpUpdatePost, 
+    wpCreatePost, 
+    wpGetPost, 
+    wpTestConnection, 
+    performEntityGapAnalysis,
+    discoverAndValidateReferences, 
+    wpUpdatePostMeta,
+    wpGetPostWithImages, 
+    wpGetFeaturedImage, 
+    extractImagesFromContent,
+    wpUpdateMediaAltText, 
+    wpGetMediaIdFromUrl, 
+    wpGetPostFullUrl,
+    discoverInternalLinkTargets
 } from './fetch-service';
-
-import { orchestrator, VALID_GEMINI_MODELS, OPENROUTER_MODELS, generateOptimizedAltText, upgradeFAQSection } from './lib/ai-orchestrator';
-
+import { 
+    orchestrator, 
+    VALID_GEMINI_MODELS, 
+    OPENROUTER_MODELS, 
+    generateOptimizedAltText, 
+    upgradeFAQSection 
+} from './lib/ai-orchestrator';
 import { getNeuronWriterAnalysis, listNeuronProjects } from './neuronwriter';
 
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔥🔥🔥 OPENROUTER MODEL SELECTOR — WITH CUSTOM MODEL INPUT
+// 📌 VERSION & CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const OPENROUTER_PRESET_MODELS = [
-    'google/gemini-2.5-flash-preview',
-    'google/gemini-2.5-pro-preview',
-    'anthropic/claude-sonnet-4',
-    'anthropic/claude-opus-4',
-    'openai/gpt-4o',
-    'openai/gpt-4o-mini',
-    'openai/o1-preview',
-    'meta-llama/llama-3.3-70b-instruct',
-    'deepseek/deepseek-chat',
-    'deepseek/deepseek-r1',
-    'mistralai/mistral-large',
-    'qwen/qwen-2.5-72b-instruct',
-];
-
-interface OpenRouterModelSelectorProps {
-    value: string;
-    onChange: (value: string) => void;
-}
-
-const OpenRouterModelSelector: React.FC<OpenRouterModelSelectorProps> = ({ value, onChange }) => {
-    const [isCustomMode, setIsCustomMode] = useState(() => {
-        // Start in custom mode if current value isn't in presets
-        return value && !OPENROUTER_PRESET_MODELS.includes(value);
-    });
-    const [customValue, setCustomValue] = useState(
-        OPENROUTER_PRESET_MODELS.includes(value) ? '' : value
-    );
-    
-    const handlePresetSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selected = e.target.value;
-        if (selected === '__custom__') {
-            setIsCustomMode(true);
-            if (customValue) onChange(customValue);
-        } else {
-            onChange(selected);
-        }
-    };
-    
-    const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value.trim();
-        setCustomValue(val);
-        if (val) onChange(val);
-    };
-    
-    return (
-        <div className="space-y-3">
-            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider block">
-                OpenRouter Model
-            </label>
-            
-            {/* Mode Toggle */}
-            <div className="flex gap-2">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setIsCustomMode(false);
-                        if (OPENROUTER_PRESET_MODELS.length > 0) {
-                            onChange(OPENROUTER_PRESET_MODELS[0]);
-                        }
-                    }}
-                    className={cn(
-                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        !isCustomMode
-                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
-                    )}
-                >
-                    📋 Preset Models
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setIsCustomMode(true)}
-                    className={cn(
-                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        isCustomMode
-                            ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
-                    )}
-                >
-                    ✏️ Custom Model
-                </button>
-            </div>
-            
-            {/* Input Based on Mode */}
-            {!isCustomMode ? (
-                <select
-                    value={OPENROUTER_PRESET_MODELS.includes(value) ? value : OPENROUTER_PRESET_MODELS[0]}
-                    onChange={handlePresetSelect}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none transition-all"
-                >
-                    {OPENROUTER_PRESET_MODELS.map(model => (
-                        <option key={model} value={model}>{model}</option>
-                    ))}
-                    <option value="__custom__">— Enter Custom Model —</option>
-                </select>
-            ) : (
-                <div className="space-y-2">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={customValue}
-                            onChange={handleCustomInput}
-                            placeholder="e.g., anthropic/claude-sonnet-4 or google/gemini-2.5-flash-preview"
-                            className="w-full bg-white/[0.03] border border-purple-500/30 rounded-xl px-4 py-3 text-[14px] focus:border-purple-500 outline-none transition-all font-mono pr-10"
-                        />
-                        {customValue && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <span className="text-green-400 text-lg">✓</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <p className="text-[11px] text-white/40">
-                            Format: provider/model-name (e.g., openai/gpt-4o)
-                        </p>
-                        <a 
-                            href="https://openrouter.ai/models"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                            Browse all models →
-                        </a>
-                    </div>
-                </div>
-            )}
-            
-            {/* Current Model Display */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] rounded-lg border border-white/[0.04]">
-                <span className="text-[10px] text-white/40 uppercase">Active Model:</span>
-                <span className="text-[12px] text-green-400 font-mono">{value || 'Not set'}</span>
-            </div>
-        </div>
-    );
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔥🔥🔥 GROQ MODEL SELECTOR — WITH CUSTOM MODEL INPUT
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const GROQ_PRESET_MODELS = [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-70b-versatile',
-    'llama-3.1-8b-instant',
-    'llama3-70b-8192',
-    'llama3-8b-8192',
-    'mixtral-8x7b-32768',
-    'gemma2-9b-it',
-    'gemma-7b-it',
-];
-
-interface GroqModelSelectorProps {
-    value: string;
-    onChange: (value: string) => void;
-}
-
-const GroqModelSelector: React.FC<GroqModelSelectorProps> = ({ value, onChange }) => {
-    const [isCustomMode, setIsCustomMode] = useState(() => {
-        return value && !GROQ_PRESET_MODELS.includes(value);
-    });
-    const [customValue, setCustomValue] = useState(
-        GROQ_PRESET_MODELS.includes(value) ? '' : value
-    );
-    
-    const handlePresetSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selected = e.target.value;
-        if (selected === '__custom__') {
-            setIsCustomMode(true);
-            if (customValue) onChange(customValue);
-        } else {
-            onChange(selected);
-        }
-    };
-    
-    const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value.trim();
-        setCustomValue(val);
-        if (val) onChange(val);
-    };
-    
-    return (
-        <div className="space-y-3">
-            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider block">
-                Groq Model
-            </label>
-            
-            {/* Mode Toggle */}
-            <div className="flex gap-2">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setIsCustomMode(false);
-                        if (GROQ_PRESET_MODELS.length > 0) {
-                            onChange(GROQ_PRESET_MODELS[0]);
-                        }
-                    }}
-                    className={cn(
-                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        !isCustomMode
-                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
-                    )}
-                >
-                    📋 Preset Models
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setIsCustomMode(true)}
-                    className={cn(
-                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        isCustomMode
-                            ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
-                    )}
-                >
-                    ✏️ Custom Model
-                </button>
-            </div>
-            
-            {/* Input Based on Mode */}
-            {!isCustomMode ? (
-                <select
-                    value={GROQ_PRESET_MODELS.includes(value) ? value : GROQ_PRESET_MODELS[0]}
-                    onChange={handlePresetSelect}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none transition-all"
-                >
-                    {GROQ_PRESET_MODELS.map(model => (
-                        <option key={model} value={model}>{model}</option>
-                    ))}
-                    <option value="__custom__">— Enter Custom Model —</option>
-                </select>
-            ) : (
-                <div className="space-y-2">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={customValue}
-                            onChange={handleCustomInput}
-                            placeholder="e.g., llama-3.3-70b-versatile or mixtral-8x7b-32768"
-                            className="w-full bg-white/[0.03] border border-purple-500/30 rounded-xl px-4 py-3 text-[14px] focus:border-purple-500 outline-none transition-all font-mono pr-10"
-                        />
-                        {customValue && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <span className="text-green-400 text-lg">✓</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <p className="text-[11px] text-white/40">
-                            Enter any Groq-supported model name
-                        </p>
-                        <a 
-                            href="https://console.groq.com/docs/models"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                            View all models →
-                        </a>
-                    </div>
-                </div>
-            )}
-            
-            {/* Current Model Display */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] rounded-lg border border-white/[0.04]">
-                <span className="text-[10px] text-white/40 uppercase">Active Model:</span>
-                <span className="text-[12px] text-green-400 font-mono">{value || 'Not set'}</span>
-            </div>
-        </div>
-    );
-};
-
+const APP_VERSION_FULL = '27.0.0';
+const MAX_SYNTHESIS_CYCLES = 3;
+const QA_PASS_THRESHOLD = 65;
+const MIN_WORD_COUNT = 3000;
+const TARGET_WORD_COUNT = 4000;
+const TITLE_MIN_LENGTH = 45;
+const TITLE_MAX_LENGTH = 65;
+const META_MIN_LENGTH = 145;
+const META_MAX_LENGTH = 160;
+const JOB_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (reduced from 25)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🔥 DEEP CLONE UTILITY — PREVENTS IMMER FREEZE ISSUES
@@ -357,7 +122,7 @@ function deepClone<T>(obj: T): T {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 FAQ DEDUPLICATION — MODULE LEVEL (v23.3 CRITICAL FIX)
+// 🔥 FAQ DEDUPLICATION — MODULE LEVEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function removeDuplicateFAQSections(html: string, log?: (msg: string) => void): string {
@@ -365,8 +130,6 @@ function removeDuplicateFAQSections(html: string, log?: (msg: string) => void): 
     
     const faqSectionPattern = /<section[^>]*(?:class|id)="[^"]*(?:faq|wp-opt-faq)[^"]*"[^>]*>[\s\S]*?<\/section>/gi;
     const allFaqSections = [...html.matchAll(faqSectionPattern)];
-    
-    const faqHeadingCount = (html.match(/<h[23][^>]*>[\s\S]*?(?:frequently\s+asked|faq)[\s\S]*?<\/h[23]>/gi) || []).length;
     
     if (allFaqSections.length <= 1) {
         log?.(`   ✓ FAQ sections: ${allFaqSections.length} (no duplicates)`);
@@ -376,7 +139,6 @@ function removeDuplicateFAQSections(html: string, log?: (msg: string) => void): 
     log?.(`   ⚠️ Found ${allFaqSections.length} FAQ sections — removing ${allFaqSections.length - 1} duplicate(s)...`);
     
     let cleaned = html;
-    
     for (let i = 0; i < allFaqSections.length - 1; i++) {
         cleaned = cleaned.replace(allFaqSections[i][0], '<!-- DUPLICATE_FAQ_REMOVED -->');
     }
@@ -385,87 +147,7 @@ function removeDuplicateFAQSections(html: string, log?: (msg: string) => void): 
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
     
     log?.(`   ✓ Removed ${allFaqSections.length - 1} duplicate FAQ section(s)`);
-    
     return cleaned;
-}
-
-const removeDuplicateFAQs = removeDuplicateFAQSections;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 CRITICAL CONSTANTS — ENTERPRISE CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const APP_VERSION_FULL = '23.3.0';
-const MAX_SYNTHESIS_CYCLES = 4;
-const QA_PASS_THRESHOLD = 65;
-const MIN_WORD_COUNT = 4000;
-const TARGET_WORD_COUNT = 4500;
-const TITLE_MIN_LENGTH = 45;
-const TITLE_MAX_LENGTH = 65;
-const META_MIN_LENGTH = 145;
-const META_MAX_LENGTH = 160;
-const JOB_TIMEOUT_MS = 25 * 60 * 1000;
-const RETRY_DELAY_BASE = 2000;
-const MAX_RETRIES = 3;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 Q&A FORMAT CLEANUP PATTERNS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const QA_FORMAT_PATTERNS = [
-    { pattern: /(<p[^>]*>)\s*Q:\s*/gi, replacement: '$1' },
-    { pattern: /(<p[^>]*>)\s*A:\s*/gi, replacement: '$1' },
-    { pattern: /<strong>Q:<\/strong>\s*/gi, replacement: '' },
-    { pattern: /<strong>A:<\/strong>\s*/gi, replacement: '' },
-    { pattern: /<span[^>]*>Q:<\/span>\s*/gi, replacement: '' },
-    { pattern: /<span[^>]*>A:<\/span>\s*/gi, replacement: '' },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface BulkJob {
-    id: string;
-    url: string;
-    status: 'queued' | 'processing' | 'completed' | 'failed';
-    progress: number;
-    error?: string;
-    startTime?: number;
-    endTime?: number;
-    score?: number;
-    phase?: string;
-    wordCount?: number;
-    attempts?: number;
-}
-
-interface BulkProcessingState {
-    isRunning: boolean;
-    jobs: BulkJob[];
-    concurrency: number;
-    completed: number;
-    failed: number;
-    totalTime: number;
-    avgScore: number;
-    totalWords: number;
-}
-
-interface BulkResult {
-    url: string;
-    success: boolean;
-    score: number;
-    time: number;
-    wordCount: number;
-    error?: string;
-}
-
-interface PostPreservationData {
-    originalSlug: string | null;
-    originalLink: string | null;
-    originalCategories: number[];
-    originalTags: number[];
-    featuredImageId: number | null;
-    contentImages: Array<{ src: string; alt: string; mediaId?: number }>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -485,13 +167,9 @@ function removeH1TagsFromContent(html: string, log?: (msg: string) => void): str
     log?.(`   ⚠️ Found ${h1CountBefore} H1 tag(s) — removing (WordPress provides H1)...`);
     
     let cleaned = html;
-    
     const patterns = [
         /<h1[^>]*>[\s\S]*?<\/h1>/gi,
         /<h1[^>]*\/>/gi,
-        /^\s*<h1[^>]*>[\s\S]*?<\/h1>\s*/i,
-        /<h1\s*>[\s\S]*?<\/h1\s*>/gi,
-        /<H1[^>]*>[\s\S]*?<\/H1>/g,
     ];
     
     for (let pass = 0; pass < 3; pass++) {
@@ -522,147 +200,222 @@ function validateContentNoH1(html: string): { valid: boolean; count: number } {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 Q&A FORMAT CLEANUP FUNCTION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function cleanupQAFormatFromContent(html: string, log?: (msg: string) => void): { html: string; cleanedCount: number } {
-    if (!html) return { html, cleanedCount: 0 };
-    
-    let cleaned = html;
-    let totalCleaned = 0;
-    
-    for (const { pattern, replacement } of QA_FORMAT_PATTERNS) {
-        const matches = cleaned.match(pattern);
-        if (matches) {
-            totalCleaned += matches.length;
-            cleaned = cleaned.replace(pattern, replacement);
-        }
-    }
-    
-    if (totalCleaned > 0) {
-        log?.(`   → Cleaned ${totalCleaned} Q&A format markers from main content`);
-    }
-    
-    return { html: cleaned, cleanedCount: totalCleaned };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 FAQ STYLING CHECK
+// 🔧 HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function hasPremiumFAQStyling(html: string): boolean {
     if (!html) return false;
-    
     const htmlLower = html.toLowerCase();
-    
-    const faqIndicators = [
-        'frequently asked',
-        'faqpage',
-        'faq-accordion',
-        'wp-opt-faq-',
-        'class="faq',
-        'id="faq',
-        '❓',
-        'itemtype="https://schema.org/faqpage"',
-    ];
-    
+    const faqIndicators = ['frequently asked', 'faqpage', 'faq-accordion', 'wp-opt-faq-', '❓'];
     const hasFAQContent = faqIndicators.some(indicator => htmlLower.includes(indicator));
-    
-    const premiumIndicators = [
-        'linear-gradient',
-        'border-left:',
-        'border-radius:',
-        'box-shadow:',
-        'backdrop-blur',
-        '!important',
-    ];
-    
+    const premiumIndicators = ['linear-gradient', 'border-radius:', 'box-shadow:', '!important'];
     const hasPremiumStyles = premiumIndicators.filter(p => html.includes(p)).length >= 2;
-    
     return hasFAQContent && hasPremiumStyles;
 }
 
+function countWords(text: string): number {
+    if (!text) return 0;
+    const stripped = text.replace(/<[^>]*>/g, ' ');
+    return stripped.split(/\s+/).filter(w => w.length > 0).length;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 Q&A PATTERN COUNTER
+// 🎛️ OPENROUTER MODEL SELECTOR COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function countQAPatternsOutsideFAQ(html: string): number {
-    if (!html) return 0;
-    
-    const htmlLower = html.toLowerCase();
-    const faqSectionStart = Math.max(
-        htmlLower.indexOf('frequently asked'),
-        htmlLower.indexOf('❓'),
-        htmlLower.lastIndexOf('faq')
+const OPENROUTER_PRESET_MODELS = [
+    'google/gemini-2.5-flash-preview',
+    'google/gemini-2.5-pro-preview',
+    'anthropic/claude-sonnet-4',
+    'anthropic/claude-opus-4',
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
+    'meta-llama/llama-3.3-70b-instruct',
+    'deepseek/deepseek-chat',
+    'deepseek/deepseek-r1',
+    'mistralai/mistral-large',
+    'qwen/qwen-2.5-72b-instruct',
+];
+
+interface OpenRouterModelSelectorProps {
+    value: string;
+    onChange: (value: string) => void;
+}
+
+const OpenRouterModelSelector: React.FC<OpenRouterModelSelectorProps> = ({ value, onChange }) => {
+    const [isCustomMode, setIsCustomMode] = useState(() => {
+        return value && !OPENROUTER_PRESET_MODELS.includes(value);
+    });
+    const [customValue, setCustomValue] = useState(
+        OPENROUTER_PRESET_MODELS.includes(value) ? '' : value
     );
     
-    const contentToCheck = faqSectionStart > 0 ? html.substring(0, faqSectionStart) : html;
-    
-    const qaPatterns = [
-        /Q:\s*[^\n<]+/gi,
-        /Question:\s*[^\n<]+/gi,
-        /<strong>Q\d*[:\s]*<\/strong>/gi,
-        /<span[^>]*>Q:<\/span>/gi,
-    ];
-    
-    let count = 0;
-    for (const pattern of qaPatterns) {
-        const matches = contentToCheck.match(pattern);
-        if (matches) count += matches.length;
-    }
-    
-    return count;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🔥 CONTENT STRUCTURE LOGGER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function logContentStructure(html: string, log: (msg: string, progress?: number) => void): void {
-    if (!html) return;
-    
-    const faqCount = (html.match(/❓|frequently\s+asked/gi) || []).length;
-    const h2Count = (html.match(/<h2/gi) || []).length;
-    const h3Count = (html.match(/<h3/gi) || []).length;
-    const imageCount = (html.match(/<img/gi) || []).length;
-    const listCount = (html.match(/<ul|<ol/gi) || []).length;
-    const tableCount = (html.match(/<table/gi) || []).length;
-    const qaPatternCount = countQAPatternsOutsideFAQ(html);
-    
-    log(`   📊 Content Structure: H2s=${h2Count} | H3s=${h3Count} | Images=${imageCount} | Lists=${listCount} | Tables=${tableCount}`);  // ✅ FIXED
-    log(`   📊 FAQ sections=${faqCount} | Q&A patterns outside FAQ=${qaPatternCount}`);  // ✅ FIXED
-    
-    if (qaPatternCount > 5) {
-        log(`   ⚠️ WARNING: High Q&A pattern count (${qaPatternCount}) — main content should be prose`);  // ✅ FIXED
-    }
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🖼️ IMAGE EXTRACTION UTILITY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function extractImagesFromHTML(html: string): Array<{ src: string; alt: string; id?: string }> {
-    const images: Array<{ src: string; alt: string; id?: string }> = [];
-    const imgRegex = /<img[^>]+>/gi;
-    const matches = html.match(imgRegex) || [];
-    
-    for (const imgTag of matches) {
-        const srcMatch = imgTag.match(/src=["']([^"']+)["']/i);
-        const altMatch = imgTag.match(/alt=["']([^"']*)["']/i);
-        const idMatch = imgTag.match(/data-id=["'](\d+)["']/i) || imgTag.match(/wp-image-(\d+)/i);
-        
-        if (srcMatch) {
-            images.push({
-                src: srcMatch[1],
-                alt: altMatch ? altMatch[1] : '',
-                id: idMatch ? idMatch[1] : undefined
-            });
+    const handlePresetSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selected = e.target.value;
+        if (selected === '__custom__') {
+            setIsCustomMode(true);
+            if (customValue) onChange(customValue);
+        } else {
+            onChange(selected);
         }
-    }
+    };
     
-    return images;
+    const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value.trim();
+        setCustomValue(val);
+        if (val) onChange(val);
+    };
+    
+    return (
+        <div className="space-y-3">
+            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider block">
+                OpenRouter Model
+            </label>
+            
+            <div className="flex gap-2">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsCustomMode(false);
+                        if (OPENROUTER_PRESET_MODELS.length > 0) {
+                            onChange(OPENROUTER_PRESET_MODELS[0]);
+                        }
+                    }}
+                    className={cn(
+                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
+                        !isCustomMode
+                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
+                    )}
+                >
+                    📋 Presets
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setIsCustomMode(true)}
+                    className={cn(
+                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
+                        isCustomMode
+                            ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
+                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white/60'
+                    )}
+                >
+                    ✏️ Custom
+                </button>
+            </div>
+            
+            {!isCustomMode ? (
+                <select
+                    value={OPENROUTER_PRESET_MODELS.includes(value) ? value : OPENROUTER_PRESET_MODELS[0]}
+                    onChange={handlePresetSelect}
+                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none transition-all"
+                >
+                    {OPENROUTER_PRESET_MODELS.map(model => (
+                        <option key={model} value={model}>{model}</option>
+                    ))}
+                    <option value="__custom__">— Custom Model —</option>
+                </select>
+            ) : (
+                <input
+                    type="text"
+                    value={customValue}
+                    onChange={handleCustomInput}
+                    placeholder="e.g., anthropic/claude-sonnet-4"
+                    className="w-full bg-white/[0.03] border border-purple-500/30 rounded-xl px-4 py-3 text-[14px] focus:border-purple-500 outline-none transition-all font-mono"
+                />
+            )}
+            
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] rounded-lg border border-white/[0.04]">
+                <span className="text-[10px] text-white/40 uppercase">Active:</span>
+                <span className="text-[12px] text-green-400 font-mono">{value || 'Not set'}</span>
+            </div>
+        </div>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎛️ GROQ MODEL SELECTOR COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const GROQ_PRESET_MODELS = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it',
+];
+
+interface GroqModelSelectorProps {
+    value: string;
+    onChange: (value: string) => void;
 }
+
+const GroqModelSelector: React.FC<GroqModelSelectorProps> = ({ value, onChange }) => {
+    const [isCustomMode, setIsCustomMode] = useState(() => {
+        return value && !GROQ_PRESET_MODELS.includes(value);
+    });
+    const [customValue, setCustomValue] = useState(
+        GROQ_PRESET_MODELS.includes(value) ? '' : value
+    );
+    
+    return (
+        <div className="space-y-3">
+            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider block">
+                Groq Model
+            </label>
+            
+            <div className="flex gap-2">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsCustomMode(false);
+                        onChange(GROQ_PRESET_MODELS[0]);
+                    }}
+                    className={cn(
+                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase transition-all border',
+                        !isCustomMode
+                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                            : 'bg-white/[0.03] border-white/[0.06] text-white/40'
+                    )}
+                >
+                    📋 Presets
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setIsCustomMode(true)}
+                    className={cn(
+                        'flex-1 py-2.5 px-3 rounded-lg text-[11px] font-semibold uppercase transition-all border',
+                        isCustomMode
+                            ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
+                            : 'bg-white/[0.03] border-white/[0.06] text-white/40'
+                    )}
+                >
+                    ✏️ Custom
+                </button>
+            </div>
+            
+            {!isCustomMode ? (
+                <select
+                    value={GROQ_PRESET_MODELS.includes(value) ? value : GROQ_PRESET_MODELS[0]}
+                    onChange={e => onChange(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none"
+                >
+                    {GROQ_PRESET_MODELS.map(model => (
+                        <option key={model} value={model}>{model}</option>
+                    ))}
+                </select>
+            ) : (
+                <input
+                    type="text"
+                    value={customValue}
+                    onChange={e => { setCustomValue(e.target.value); onChange(e.target.value); }}
+                    placeholder="e.g., llama-3.3-70b-versatile"
+                    className="w-full bg-white/[0.03] border border-purple-500/30 rounded-xl px-4 py-3 text-[14px] focus:border-purple-500 outline-none font-mono"
+                />
+            )}
+        </div>
+    );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🚀 MAIN APP COMPONENT
@@ -682,7 +435,7 @@ const App: React.FC = () => {
     const [reviewTab, setReviewTab] = useState<'content' | 'qa' | 'entity'>('content');
     const [wpTestStatus, setWpTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
     const [crawlProgress, setCrawlProgress] = useState<{ current: number; total: number } | null>(null);
-    const [neuronProjects, setNeuronProjects] = useState<Array<{ project: string; name: string; language?: string; engine?: string }>>([]);
+    const [neuronProjects, setNeuronProjects] = useState<Array<{ project: string; name: string }>>([]);
     const [neuronLoading, setNeuronLoading] = useState(false);
     
     const [optimizationMode, setOptimizationMode] = useState<OptimizationMode>('surgical');
@@ -692,14 +445,6 @@ const App: React.FC = () => {
     const [preserveCategories, setPreserveCategories] = useState(true);
     const [preserveTags, setPreserveTags] = useState(true);
     
-    const [sitemapFilters, setSitemapFilters] = useState({
-        includeCategories: false,
-        includeAuthors: false,
-        includeTags: false,
-        includePages: true,
-        maxPages: 5000
-    });
-    
     const [geoConfig, setGeoConfig] = useState<GeoTargetConfig>({
         enabled: false,
         country: 'US',
@@ -707,6 +452,9 @@ const App: React.FC = () => {
         city: '',
         language: 'en'
     });
+
+    // Stage progress for staged pipeline
+    const [stageProgress, setStageProgress] = useState<StageProgress | null>(null);
 
     // Bulk optimization state
     const [bulkUrls, setBulkUrls] = useState('');
@@ -723,15 +471,8 @@ const App: React.FC = () => {
         totalWords: 0
     });
     const bulkAbortRef = useRef(false);
-
-        const autonomousIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-        
-    const lockId = useRef(`app-${Date.now()}`);
     
-    // ═══════════════════════════════════════════════════════════════════════════
-    // 🔥 NEW: CANCELLATION SYSTEM FOR LONG-RUNNING JOBS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
+    // Cancellation system
     const cancellationTokenRef = useRef<{ cancelled: boolean; reason?: string }>({ cancelled: false });
     
     const cancelCurrentJob = useCallback((reason: string = 'User cancelled') => {
@@ -743,18 +484,11 @@ const App: React.FC = () => {
     const resetCancellationToken = useCallback(() => {
         cancellationTokenRef.current = { cancelled: false, reason: undefined };
     }, []);
-    
-    const checkCancellation = useCallback((phase: string): void => {
-        if (cancellationTokenRef.current.cancelled) {
-            throw new Error(`Job cancelled during ${phase}: ${cancellationTokenRef.current.reason}`);
-        }
-    }, []);
 
     const activePage = useMemo(() => 
         store.pages.find(p => p.id === activePageId), 
         [store.pages, activePageId]
     );
-
 
     // ═══════════════════════════════════════════════════════════════════════════
     // HELPERS
@@ -788,57 +522,6 @@ const App: React.FC = () => {
         return !!(store.neuronEnabled && store.apiKeys.neuronwriter && store.apiKeys.neuronProject);
     }, [store.neuronEnabled, store.apiKeys.neuronwriter, store.apiKeys.neuronProject]);
 
-    const enforceTitle = useCallback((title: string, log: (msg: string) => void): string => {
-        if (!title) return title;
-        const titleLength = title.length;
-        
-        if (titleLength >= TITLE_MIN_LENGTH && titleLength <= TITLE_MAX_LENGTH) {
-            log(`   ✓ Title length optimal: ${titleLength} chars`);
-            return title;
-        }
-        
-        if (titleLength <= TITLE_MAX_LENGTH) return title;
-        
-        let truncated = title.substring(0, 60);
-        const lastDash = truncated.lastIndexOf(' - ');
-        const lastColon = truncated.lastIndexOf(': ');
-        const lastPipe = truncated.lastIndexOf(' | ');
-        const lastSpace = truncated.lastIndexOf(' ');
-        const breakPoint = Math.max(lastDash, lastColon, lastPipe);
-        
-        if (breakPoint > 35) truncated = truncated.substring(0, breakPoint);
-        else if (lastSpace > 40) truncated = truncated.substring(0, lastSpace);
-        
-        truncated = truncated.trim();
-        log(`   ⚠️ Title truncated: ${titleLength} → ${truncated.length} chars`);
-        return truncated;
-    }, []);
-
-    const enforceMeta = useCallback((meta: string, log: (msg: string) => void): string => {
-        if (!meta) return meta;
-        const metaLength = meta.length;
-        
-        if (metaLength >= META_MIN_LENGTH && metaLength <= META_MAX_LENGTH) {
-            log(`   ✓ Meta length optimal: ${metaLength} chars`);
-            return meta;
-        }
-        
-        if (metaLength <= META_MAX_LENGTH) return meta;
-        
-        let truncated = meta.substring(0, 157);
-        const lastPeriod = truncated.lastIndexOf('. ');
-        
-        if (lastPeriod > 100) truncated = truncated.substring(0, lastPeriod + 1);
-        else {
-            const lastSpace = truncated.lastIndexOf(' ');
-            if (lastSpace > 140) truncated = truncated.substring(0, lastSpace) + '...';
-            else truncated = truncated.trim() + '...';
-        }
-        
-        log(`   ⚠️ Meta truncated: ${metaLength} → ${truncated.length} chars`);
-        return truncated;
-    }, []);
-
     const getActualModel = useCallback(() => {
         switch (store.selectedProvider) {
             case 'openrouter':
@@ -853,6 +536,31 @@ const App: React.FC = () => {
                 return store.selectedModel;
         }
     }, [store.selectedProvider, store.apiKeys.openrouterModel, store.apiKeys.groqModel, store.selectedModel]);
+
+    const enforceTitle = useCallback((title: string, log: (msg: string) => void): string => {
+        if (!title) return title;
+        if (title.length <= TITLE_MAX_LENGTH) return title;
+        
+        let truncated = title.substring(0, 60);
+        const lastSpace = truncated.lastIndexOf(' ');
+        if (lastSpace > 40) truncated = truncated.substring(0, lastSpace);
+        
+        log(`   ⚠️ Title truncated: ${title.length} → ${truncated.length} chars`);
+        return truncated.trim();
+    }, []);
+
+    const enforceMeta = useCallback((meta: string, log: (msg: string) => void): string => {
+        if (!meta) return meta;
+        if (meta.length <= META_MAX_LENGTH) return meta;
+        
+        let truncated = meta.substring(0, 157);
+        const lastPeriod = truncated.lastIndexOf('. ');
+        if (lastPeriod > 100) truncated = truncated.substring(0, lastPeriod + 1);
+        else truncated = truncated.trim() + '...';
+        
+        log(`   ⚠️ Meta truncated: ${meta.length} → ${truncated.length} chars`);
+        return truncated;
+    }, []);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // WORDPRESS CONNECTION TEST
@@ -882,28 +590,6 @@ const App: React.FC = () => {
     }, [store, getAuth]);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // NEURONWRITER PROJECT LOADER
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    const loadNeuronProjects = useCallback(async () => {
-        if (!store.apiKeys.neuronwriter) {
-            store.addToast('Enter NeuronWriter API key first', 'warning');
-            return;
-        }
-        
-        setNeuronLoading(true);
-        try {
-            const projects = await listNeuronProjects(store.apiKeys.neuronwriter);
-            setNeuronProjects(projects);
-            store.addToast(projects.length ? `Found ${projects.length} projects` : 'No projects found', projects.length ? 'success' : 'warning');
-        } catch (e: any) {
-            store.addToast(`Failed: ${e.message}`, 'error');
-        } finally {
-            setNeuronLoading(false);
-        }
-    }, [store]);
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // SITEMAP CRAWLER
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -914,10 +600,8 @@ const App: React.FC = () => {
         }
         
         store.setProcessing(true, 'Crawling sitemap...');
-        store.addGodLog(`🕷️ ════════════════════════════════════════════════════════════════`);
         store.addGodLog(`🕷️ ULTRA-FAST SITEMAP CRAWLER v${APP_VERSION_FULL}`);
         store.addGodLog(`🕷️ URL: ${sitemapUrl}`);
-        store.addGodLog(`🕷️ ════════════════════════════════════════════════════════════════`);
         
         const startTime = Date.now();
         
@@ -925,31 +609,22 @@ const App: React.FC = () => {
             let text = '';
             let fetchSucceeded = false;
             
-            // Strategy 1: Direct fetch
+            // Try direct fetch first
             try {
-                store.addGodLog(`   → Attempting direct fetch...`);
                 const directRes = await fetch(sitemapUrl, {
                     method: 'GET',
-                    headers: {
-                        'Accept': 'application/xml, text/xml, */*',
-                        'User-Agent': 'Mozilla/5.0 (compatible; WPOptimizerBot/1.0)',
-                        'Cache-Control': 'no-cache'
-                    }
+                    headers: { 'Accept': 'application/xml, text/xml, */*' }
                 });
-                
                 if (directRes.ok) {
                     text = await directRes.text();
                     fetchSucceeded = true;
                     store.addGodLog(`   ✅ Direct fetch succeeded`);
                 }
-            } catch (e: any) {
-                store.addGodLog(`   ⚠️ Direct fetch error: ${e.message}`);
-            }
+            } catch {}
             
-            // Strategy 2: CORS proxy
+            // Fallback to CORS proxy
             if (!fetchSucceeded) {
                 try {
-                    store.addGodLog(`   → Trying CORS proxy...`);
                     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(sitemapUrl)}`;
                     const proxyRes = await fetch(proxyUrl);
                     if (proxyRes.ok) {
@@ -957,25 +632,7 @@ const App: React.FC = () => {
                         fetchSucceeded = true;
                         store.addGodLog(`   ✅ CORS proxy succeeded`);
                     }
-                } catch (e: any) {
-                    store.addGodLog(`   ⚠️ CORS proxy error: ${e.message}`);
-                }
-            }
-            
-            // Strategy 3: AllOrigins proxy
-            if (!fetchSucceeded) {
-                try {
-                    store.addGodLog(`   → Trying AllOrigins proxy...`);
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(sitemapUrl)}`;
-                    const proxyRes = await fetch(proxyUrl);
-                    if (proxyRes.ok) {
-                        text = await proxyRes.text();
-                        fetchSucceeded = true;
-                        store.addGodLog(`   ✅ AllOrigins proxy succeeded`);
-                    }
-                } catch (e: any) {
-                    store.addGodLog(`   ⚠️ AllOrigins proxy error: ${e.message}`);
-                }
+                } catch {}
             }
             
             if (!fetchSucceeded || !text) {
@@ -983,79 +640,22 @@ const App: React.FC = () => {
             }
             
             const xml = new DOMParser().parseFromString(text, 'application/xml');
-            let allUrls: string[] = [];
-            
-            const sitemapUrls = Array.from(xml.querySelectorAll('sitemap loc'))
+            let allUrls: string[] = Array.from(xml.querySelectorAll('url loc, loc'))
                 .map(el => el.textContent || '')
                 .filter(Boolean);
-            
-            if (sitemapUrls.length > 0) {
-                store.addGodLog(`📋 Sitemap INDEX: ${sitemapUrls.length} child sitemaps`);
-                setCrawlProgress({ current: 0, total: sitemapUrls.length });
-                
-                const BATCH_SIZE = 5;
-                
-                for (let i = 0; i < sitemapUrls.length; i += BATCH_SIZE) {
-                    const batch = sitemapUrls.slice(i, i + BATCH_SIZE);
-                    
-                    const batchResults = await Promise.allSettled(
-                        batch.map(async (childUrl) => {
-                            try {
-                                const childRes = await titanFetch(childUrl, { timeoutMs: 12000, retries: 2 });
-                                const childText = await childRes.text();
-                                const childXml = new DOMParser().parseFromString(childText, 'application/xml');
-                                return Array.from(childXml.querySelectorAll('url loc'))
-                                    .map(el => el.textContent || '')
-                                    .filter(Boolean);
-                            } catch {
-                                return [];
-                            }
-                        })
-                    );
-                    
-                    batchResults.forEach((result) => {
-                        if (result.status === 'fulfilled') {
-                            allUrls.push(...result.value);
-                        }
-                    });
-                    
-                    setCrawlProgress({ current: Math.min(i + BATCH_SIZE, sitemapUrls.length), total: sitemapUrls.length });
-                    store.addGodLog(`   📊 Progress: ${Math.min(i + BATCH_SIZE, sitemapUrls.length)}/${sitemapUrls.length} sitemaps (${allUrls.length} URLs)`);
-                }
-                
-                setCrawlProgress(null);
-            } else {
-                allUrls = Array.from(xml.querySelectorAll('url loc, loc'))
-                    .map(el => el.textContent || '')
-                    .filter(Boolean);
-                store.addGodLog(`📋 Regular sitemap: ${allUrls.length} URLs found`);
-            }
             
             const uniqueUrls = [...new Set(allUrls)].filter(url => {
                 if (!url || !url.startsWith('http')) return false;
                 const lower = url.toLowerCase();
-                
-                const alwaysExclude = [
-                    '?', '.xml', '/wp-admin', '/wp-content', '/wp-json', '/feed/',
-                    'attachment', '/cart', '/checkout', '/my-account', '/wp-login', 
-                    '.pdf', '.jpg', '.png', '.gif', '.css', '.js', '.ico', '.svg'
-                ];
-                if (alwaysExclude.some(p => lower.includes(p))) return false;
-                
-                if (!sitemapFilters.includeCategories && lower.includes('/category/')) return false;
-                if (!sitemapFilters.includeAuthors && lower.includes('/author/')) return false;
-                if (!sitemapFilters.includeTags && lower.includes('/tag/')) return false;
-                if (!sitemapFilters.includePages && lower.includes('/page/')) return false;
-                
-                return true;
-            }).slice(0, sitemapFilters.maxPages);
+                const exclude = ['?', '.xml', '/wp-admin', '/wp-content', '/wp-json', '/feed/', '.pdf', '.jpg', '.png'];
+                return !exclude.some(p => lower.includes(p));
+            }).slice(0, 300);
             
-            store.addGodLog(`🔍 After filtering: ${uniqueUrls.length} valid URLs`);
+            store.addGodLog(`🔍 Found ${uniqueUrls.length} valid URLs`);
             
             const discovered: SitemapPage[] = uniqueUrls.map(url => {
                 const slug = sanitizeSlug(extractSlugFromUrl(url));
                 let title = '';
-                
                 try {
                     const pathParts = new URL(url).pathname.split('/').filter(Boolean);
                     if (pathParts.length > 0) {
@@ -1065,13 +665,9 @@ const App: React.FC = () => {
                     }
                 } catch {}
                 
-                if (!title || title.toLowerCase() === 'home' || title.length < 3) {
-                    title = sanitizeTitle('', slug);
-                }
-                
                 return {
                     id: url,
-                    title,
+                    title: title || 'Page',
                     slug,
                     lastMod: null,
                     wordCount: null,
@@ -1086,12 +682,8 @@ const App: React.FC = () => {
             store.addPages(discovered);
             
             const elapsed = Date.now() - startTime;
-            store.addGodLog(`🎉 ════════════════════════════════════════════════════════════════`);
             store.addGodLog(`🎉 CRAWL COMPLETE: ${discovered.length} pages in ${formatDuration(elapsed)}`);
-            store.addGodLog(`🎉 Speed: ${Math.round(discovered.length / (elapsed / 1000))} pages/sec`);
-            store.addGodLog(`🎉 ════════════════════════════════════════════════════════════════`);
-            
-            store.addToast(`Discovered ${discovered.length} pages in ${formatDuration(elapsed)}`, 'success');
+            store.addToast(`Discovered ${discovered.length} pages`, 'success');
             setSitemapUrl('');
         } catch (e: any) {
             store.addGodLog(`❌ Crawl failed: ${e.message}`);
@@ -1100,39 +692,29 @@ const App: React.FC = () => {
             store.setProcessing(false);
             setCrawlProgress(null);
         }
-    }, [sitemapUrl, store, sitemapFilters]);
+    }, [sitemapUrl, store]);
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // 🔥🔥🔥 GOD MODE ENGINE — WITH IMMER FREEZE FIX
-    // ═══════════════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🔥🔥🔥 GOD MODE ENGINE — WITH STAGED PIPELINE INTEGRATION
+    // ═══════════════════════════════════════════════════════════════════════════
 
-        const executeGodMode = useCallback(async (targetOverride?: string, silentMode = false): Promise<{ success: boolean; score: number; wordCount: number; error?: string }> => {
+    const executeGodMode = useCallback(async (
+        targetOverride?: string, 
+        silentMode = false
+    ): Promise<{ success: boolean; score: number; wordCount: number; error?: string }> => {
         const startTime = Date.now();
         let targetId = targetOverride;
         
-        // 🔥 NEW: Reset cancellation token at job start
         resetCancellationToken();
+        setStageProgress(null);
         
-        // 🔥 FIX: Changed second parameter from boolean to number to match orchestrator signature
-const log = (msg: string, _progressOrForce?: number | boolean) => { 
-    // Handle both boolean (forceGlobal) and number (progress) for compatibility
-    const forceGlobal = typeof _progressOrForce === 'boolean' ? _progressOrForce : false;
-    if (targetId) store.addJobLog(targetId, msg);
-    if (!silentMode || forceGlobal) store.addGodLog(msg); 
-};
-
-        
-        // 🔥 NEW: Helper to check cancellation at phase boundaries
-        const checkPhase = (phaseName: string) => {
-            if (cancellationTokenRef.current.cancelled) {
-                throw new Error(`Job cancelled during ${phaseName}: ${cancellationTokenRef.current.reason || 'User request'}`);
-            }
+        const log = (msg: string, _progress?: number) => { 
+            if (targetId) store.addJobLog(targetId, msg);
+            if (!silentMode) store.addGodLog(msg); 
         };
 
-
-        const failWith = (error: string, logMsg?: string): { success: false; score: 0; wordCount: 0; error: string } => {
-            const msg = logMsg || error;
-            log(`❌ ${msg}`, true);
+        const failWith = (error: string): { success: false; score: 0; wordCount: 0; error: string } => {
+            log(`❌ ${error}`, 0);
             return { success: false, score: 0, wordCount: 0, error };
         };
         
@@ -1146,17 +728,13 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 try {
                     const pathParts = new URL(manualUrl).pathname.split('/').filter(Boolean);
                     if (pathParts.length > 0) {
-                        title = pathParts[pathParts.length - 1]
-                            .replace(/-/g, ' ')
-                            .replace(/\b\w/g, l => l.toUpperCase());
+                        title = pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     }
                 } catch {}
                 
-                if (!title || title.length < 3) title = 'New Page';
-                
                 const newPage: SitemapPage = { 
                     id: manualUrl, 
-                    title, 
+                    title: title || 'New Page', 
                     slug, 
                     lastMod: new Date().toISOString(), 
                     wordCount: null, 
@@ -1172,7 +750,6 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             if (!silentMode) setManualUrl('');
         }
         
-        // Find next target from queue
         if (!targetId) {
             const candidates = store.pages
                 .filter(p => p.jobState?.status !== 'running')
@@ -1180,35 +757,22 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             targetId = candidates[0]?.id;
         }
 
-        if (!targetId) {
-            return failWith('No pages to optimize', 'No target URL found');
-        }
-
-        if (!hasRequiredKeys()) {
-            return failWith('No AI API key configured', 'Configure at least one AI API key');
-        }
-
-        if (!store.wpConfig.url) {
-            return failWith('WordPress URL not configured');
-        }
-
-        if (!store.wpConfig.username || !store.wpConfig.password) {
-            return failWith('WordPress credentials not configured');
-        }
+        if (!targetId) return failWith('No pages to optimize');
+        if (!hasRequiredKeys()) return failWith('No AI API key configured');
+        if (!store.wpConfig.url) return failWith('WordPress URL not configured');
+        if (!store.wpConfig.username || !store.wpConfig.password) return failWith('WordPress credentials not configured');
 
         const getPage = () => useAppStore.getState().pages.find(p => p.id === targetId)!;
-        const getJob = () => getPage()?.jobState;
-
-        if (!getJob()) {
+        
+        if (!getPage()?.jobState) {
             store.initJobState(targetId);
         }
 
-        const currentAttempts = (getJob()?.attempts || 0) + 1;
         store.updateJobState(targetId, { 
             status: 'running', 
             phase: 'initializing', 
             error: undefined, 
-            attempts: currentAttempts,
+            attempts: (getPage()?.jobState?.attempts || 0) + 1,
             startTime
         });
         store.updatePage(targetId, { status: 'analyzing' });
@@ -1231,67 +795,28 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             // ═══════════════════════════════════════════════════════════════
             
             store.updateJobState(targetId, { phase: 'resolving_post' });
-            log(`📍 PHASE 1: Resolving WordPress post...`, true);
+            log(`📍 PHASE 1: Resolving WordPress post...`);
             
             let originalContent = '';
-            let mode: 'surgical' | 'writer' = optimizationMode === 'surgical' ? 'surgical' : 'writer';
-            let existingAnalysis = undefined;
             let topic = getPage().title;
             let postId: number | null = null;
 
-            log(`   → Using enhanced multi-strategy post resolution...`);
-
-            postId = await wpResolvePostIdEnhanced(
-                store.wpConfig.url,
-                targetId,
-                auth,
-                (msg) => log(msg)
-            );
+            postId = await wpResolvePostIdEnhanced(store.wpConfig.url, targetId, auth, log);
 
             if (!postId) {
-                log(`   ⚠️⚠️⚠️ WARNING: Could not find existing post!`, true);
-                log(`   ⚠️ URL: ${targetId}`, true);
-                
-                if (!silentMode) {
-                    const confirmCreate = window.confirm(
-                        `⚠️ Could not find existing post at:\n${targetId}\n\n` +
-                        `This will CREATE A NEW POST which may result in a duplicate URL.\n\n` +
-                        `Click OK to create new post, or Cancel to abort.`
-                    );
-                    
-                    if (!confirmCreate) {
-                        return failWith('User cancelled: Post not found', 'Aborted — post not found');
-                    }
-                }
-                
-                log(`   → Will create new content (no existing post found)`);
-                mode = 'writer';
+                log(`   ⚠️ Could not find existing post — will create new`);
             } else {
-                log(`   ✅ Found existing post ID: ${postId}`, true);
-            }
-
-            if (postId && auth.p) {
-                store.updateJobState(targetId, { postId });
-                log(`   → Found existing post (ID: ${postId})`);
+                log(`   ✅ Found existing post ID: ${postId}`);
                 
                 try {
-                    store.updateJobState(targetId, { phase: 'analyzing_existing' });
-                    
                     const postData = await wpGetPostWithImages(store.wpConfig.url, postId, auth);
-                    const post = postData.post;
-                    
                     preservation.originalSlug = postData.originalSlug;
-                    preservation.originalLink = post.link || null;
+                    preservation.originalLink = postData.post.link || null;
                     preservation.originalCategories = postData.originalCategories;
                     preservation.originalTags = postData.originalTags;
                     
-                    log(`   → 🔒 Original slug: "${preservation.originalSlug}"`);
-                    log(`   → 🔒 Original link: "${preservation.originalLink}"`);
-                    log(`   → 🔒 Categories: [${preservation.originalCategories.join(', ')}]`);
-                    
                     if (postData.featuredImage && preserveFeaturedImage) {
                         preservation.featuredImageId = postData.featuredImage.id;
-                        log(`   → 🖼️ Featured image preserved (ID: ${preservation.featuredImageId})`);
                     }
                     
                     if (preserveImages) {
@@ -1300,141 +825,59 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                             alt: img.alt,
                             mediaId: img.id ? parseInt(img.id) : undefined
                         }));
-                        
-                        if (preservation.contentImages.length > 0) {
-                            log(`   → 🖼️ Found ${preservation.contentImages.length} images in content to preserve`);
-                        }
                     }
                     
-                    const wpTitle = post.title?.rendered || post.title?.raw || '';
-                    if (wpTitle && wpTitle.length > 3 && wpTitle.toLowerCase() !== 'auto draft') {
+                    const wpTitle = postData.post.title?.rendered || postData.post.title?.raw || '';
+                    if (wpTitle && wpTitle.length > 3) {
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = wpTitle;
-                        topic = tempDiv.textContent || tempDiv.innerText || wpTitle;
+                        topic = tempDiv.textContent || wpTitle;
                         store.updatePage(targetId, { title: topic });
-                        log(`   → Retrieved title: "${topic}"`);
                     }
                     
-                    originalContent = post.content?.rendered || post.content?.raw || '';
-                    
-                    if (originalContent.length > 500) {
-                        existingAnalysis = analyzeExistingContent(originalContent);
-                        store.updateJobState(targetId, { existingAnalysis });
-                        log(`   → Existing: ${existingAnalysis.wordCount} words | Images: ${existingAnalysis.imageCount} | FAQ: ${existingAnalysis.hasFAQ ? '✓' : '✗'}`);
-                    }
+                    originalContent = postData.post.content?.rendered || '';
                 } catch (e: any) {
-                    log(`   ⚠️ Could not fetch existing content: ${e.message}`, true);
+                    log(`   ⚠️ Could not fetch existing content: ${e.message}`);
                 }
-            } else {
-                log(`   → Creating new content (no existing post found)`);
-                mode = 'writer';
             }
 
-            // Topic detection
             if (targetKeywordOverride && targetKeywordOverride.trim().length > 3) {
                 topic = targetKeywordOverride.trim();
                 store.updatePage(targetId, { title: topic, targetKeyword: topic });
-                log(`   → Using keyword override: "${topic}"`);
                 if (!silentMode) setTargetKeywordOverride('');
-            } else if (!topic || topic.toLowerCase() === 'home' || topic.length < 5) {
-                try {
-                    const targetUrl = new URL(targetId);
-                    const pathParts = targetUrl.pathname.split('/').filter(Boolean);
-                    if (pathParts.length > 0 && pathParts[pathParts.length - 1].length > 3) {
-                        topic = pathParts[pathParts.length - 1]
-                            .replace(/-/g, ' ')
-                            .replace(/\b\w/g, l => l.toUpperCase());
-                    }
-                } catch {}
-                
-                if (!topic || topic.length < 5) {
-                    topic = `${siteContext.orgName} Guide ${new Date().getFullYear()}`;
-                }
-                store.updatePage(targetId, { title: topic });
             }
 
             const actualModel = getActualModel();
             
-            log(`🚀 ═══════════════════════════════════════════════════════════`, true);
-            log(`🚀 GOD MODE: "${topic.substring(0, 50)}..."`, true);
-            log(`🚀 Mode: ${optimizationMode.toUpperCase()} | Provider: ${store.selectedProvider}`, true);
-            log(`🚀 Preserve: Images=${preserveImages} | Featured=${preserveFeaturedImage} | Alt=${optimizeAltText}`, true);
-            log(`🚀 ═══════════════════════════════════════════════════════════`, true);
+            log(`🚀 ═══════════════════════════════════════════════════════════`);
+            log(`🚀 GOD MODE: "${topic.substring(0, 50)}..."`);
+            log(`🚀 Provider: ${store.selectedProvider} | Model: ${actualModel}`);
+            log(`🚀 ═══════════════════════════════════════════════════════════`);
 
             // ═══════════════════════════════════════════════════════════════
-            // PHASE 2: PARALLEL DATA GATHERING
+            // PHASE 2: ENTITY GAP ANALYSIS
             // ═══════════════════════════════════════════════════════════════
             
             let entityGapData = undefined;
 
             if (store.apiKeys.serper) {
                 store.updateJobState(targetId, { phase: 'entity_gap_analysis' });
-                log(`🔬 PHASE 2: Parallel Data Gathering...`, true);
+                log(`🔬 PHASE 2: Entity Gap Analysis...`);
                 
                 try {
-                    const cachedEntityData = (store as any).getSemanticCache?.('entityGap', topic, 7200000);
-                    
-                    if (cachedEntityData) {
-                        log(`   → Using CACHED entity data`);
-                        entityGapData = cachedEntityData;
-                    } else {
-                        const geoOptions = geoConfig.enabled 
-                            ? { geoCountry: geoConfig.country, geoLanguage: geoConfig.language } 
-                            : undefined;
-                        
-                        log(`   → Starting parallel: Entity Gap + Reference Discovery...`);
-                        const parallelStart = Date.now();
-                        
-                        const [entityResult, refsResult] = await Promise.allSettled([
-                            performEntityGapAnalysis(
-                                topic, 
-                                store.apiKeys.serper,
-                                originalContent || undefined,
-                                geoOptions,
-                                (msg) => log(`   [Entity] ${msg}`)
-                            ),
-                            discoverAndValidateReferences(
-                                topic,
-                                store.apiKeys.serper,
-                                { targetCount: 15, ...geoOptions },
-                                (msg) => log(`   [Refs] ${msg}`)
-                            )
-                        ]);
-                        
-                        const parallelTime = Date.now() - parallelStart;
-                        log(`   ✓ Parallel gathering completed in ${formatDuration(parallelTime)}`);
-                        
-                        if (entityResult.status === 'fulfilled') {
-                            entityGapData = entityResult.value;
-                            
-                            if (refsResult.status === 'fulfilled' && refsResult.value.length > 0) {
-                                const existingUrls = new Set(
-                                    (entityGapData.validatedReferences || []).map(r => r.url)
-                                );
-                                const newRefs = refsResult.value.filter(r => !existingUrls.has(r.url));
-                                
-                                if (newRefs.length > 0) {
-                                    entityGapData.validatedReferences = [
-                                        ...(entityGapData.validatedReferences || []),
-                                        ...newRefs
-                                    ].slice(0, 15);
-                                    log(`   → Merged ${newRefs.length} additional references`);
-                                }
-                            }
-                            
-                            (store as any).setSemanticCache?.('entityGap', topic, entityGapData);
-                        } else {
-                            throw new Error(entityResult.reason?.message || 'Entity analysis failed');
-                        }
-                    }
+                    entityGapData = await performEntityGapAnalysis(
+                        topic, 
+                        store.apiKeys.serper,
+                        originalContent || undefined,
+                        geoConfig.enabled ? { geoCountry: geoConfig.country } : undefined,
+                        log
+                    );
                     
                     store.updateJobState(targetId, { entityGapData });
-                    log(`   ✓ Entities: ${entityGapData.missingEntities?.length || 0} | PAA: ${entityGapData.paaQuestions?.length || 0} | Refs: ${entityGapData.validatedReferences?.length || 0}`);
+                    log(`   ✓ Entities: ${entityGapData.missingEntities?.length || 0} | PAA: ${entityGapData.paaQuestions?.length || 0}`);
                 } catch (e: any) {
-                    log(`   ⚠️ Data gathering failed: ${e.message}`, true);
+                    log(`   ⚠️ Entity analysis failed: ${e.message}`);
                 }
-            } else {
-                log(`⚠️ Skipping entity analysis (no Serper API key)`, true);
             }
 
             // ═══════════════════════════════════════════════════════════════
@@ -1443,7 +886,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             
             let neuronData = undefined;
 
-            if (store.neuronEnabled && store.apiKeys.neuronwriter && store.apiKeys.neuronProject) {
+            if (hasNeuronConfig()) {
                 store.updateJobState(targetId, { phase: 'neuron_analysis' });
                 log(`🧬 PHASE 3: NeuronWriter NLP Analysis...`);
                 
@@ -1458,10 +901,10 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                     if (neuronData) {
                         store.updateJobState(targetId, { neuronData });
                         store.setNeuronTerms(neuronData.terms);
-                        log(`   → ${neuronData.terms.length} NLP terms | Target: ${neuronData.targetWordCount} words`);
+                        log(`   → ${neuronData.terms.length} NLP terms`);
                     }
                 } catch (e: any) {
-                    log(`   ⚠️ NeuronWriter failed: ${e.message}`, true);
+                    log(`   ⚠️ NeuronWriter failed: ${e.message}`);
                 }
             }
 
@@ -1473,574 +916,154 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             log(`🔗 PHASE 4: Building internal links...`);
             
             const internalLinks: InternalLinkTarget[] = store.pages
-                .filter(p => p.id !== targetId && p.title && p.title.length > 5 && p.title.toLowerCase() !== 'home')
+                .filter(p => p.id !== targetId && p.title && p.title.length > 5)
                 .slice(0, 50)
                 .map(p => ({ url: p.id, title: p.title, slug: p.slug }));
             
             log(`   → ${internalLinks.length} potential link targets`);
 
             // ═══════════════════════════════════════════════════════════════
-            // PHASE 5: CONTENT SYNTHESIS — WITH IMMER FREEZE FIX 🔥🔥🔥
+            // PHASE 5: CONTENT SYNTHESIS — STAGED PIPELINE
             // ═══════════════════════════════════════════════════════════════
 
-            let synthesisAttempts = 0;
-            let qaPassed = false;
-            let allFeedback: string[] = [...(getJob()?.allFeedback || [])];
-            let bestContract: ContentContract | null = null;
-            let bestScore = 0;
-            let bestWordCount = 0;
-            let lastSynthesisError: string | null = null;
-
-            const targetWordCount = neuronData?.targetWordCount || 4500;
+            store.updateJobState(targetId, { phase: 'content_synthesis' });
+            log(`🎨 PHASE 5: SOTA Content Synthesis (Staged Pipeline)...`);
 
             const synthesisConfig = {
                 prompt: `Create comprehensive content about "${topic}"`,
                 topic,
-                mode,
+                mode: optimizationMode === 'surgical' ? 'surgical' as const : 'writer' as const,
                 siteContext,
                 model: actualModel,
                 provider: store.selectedProvider,
                 apiKeys: store.apiKeys,
                 entityGapData,
                 neuronData: neuronData || undefined,
-                existingAnalysis,
+                existingAnalysis: originalContent ? analyzeExistingContent(originalContent) : undefined,
                 internalLinks,
                 targetKeyword: topic,
                 validatedReferences: entityGapData?.validatedReferences,
                 geoConfig: geoConfig.enabled ? geoConfig : undefined,
+                useStagedPipeline: true,
+                targetWords: TARGET_WORD_COUNT,
             };
 
-            const useEnhancedPipeline = !!(store.apiKeys.google && store.selectedProvider === 'google');
-            const useSERPGenerators = hasSerperKey() && !!entityGapData;
-            const useNLPInjector = hasNeuronConfig() && neuronData?.terms && neuronData.terms.length > 0;
+            let bestContract: ContentContract | null = null;
+            let bestScore = 0;
+            let bestWordCount = 0;
 
-            log(`🎨 PHASE 5: SOTA Content Synthesis...`, true);
-            log(`   → Mode: ${optimizationMode.toUpperCase()} | Provider: ${store.selectedProvider.toUpperCase()}`, true);
-            log(`   → Pipeline: Staged=${useEnhancedPipeline} | SERP=${useSERPGenerators} | NLP=${useNLPInjector}`, true);
-            log(`   → Target: ${targetWordCount.toLocaleString()}+ words | 70%+ NLP coverage`, true);
-
-            // ═══════════════════════════════════════════════════════════════
-            // 🔥 OPTION A: SOTA MULTI-STAGE PIPELINE
-            // ═══════════════════════════════════════════════════════════════
-
-            if (useEnhancedPipeline) {
-                store.updateJobState(targetId, { phase: 'content_synthesis' });
-                log(`🚀 Using SOTA Multi-Stage Pipeline...`, true);
-
-                try {
-                    const { contract: _rawContract, groundingSources } = await orchestrator.generateEnhanced(
-                        {
-                            ...synthesisConfig,
-                            previousAttempts: synthesisAttempts,
-                            allFeedback: allFeedback.length > 0 ? allFeedback : undefined,
-                            temperature: 0.85,
-                            useStagedPipeline: true,
-                            useSERPGenerators: useSERPGenerators,
-                            useNLPInjector: useNLPInjector,
-                            targetNLPCoverage: 85,
-                        },
-                        log,
-                        (stageProgress) => {
-                            if (stageProgress.stage === 'outline') {
-                                store.updateJobState(targetId, { phase: 'prompt_assembly' });
-                            } else if (stageProgress.stage === 'sections') {
-                                store.updateJobState(targetId, { phase: 'content_synthesis' });
-                            } else if (stageProgress.stage === 'merge') {
-                                store.updateJobState(targetId, { phase: 'final_polish' });
-                            } else if (stageProgress.stage === 'polish') {
-                                store.updateJobState(targetId, { phase: 'qa_validation' });
-                            }
+            try {
+                // Use the staged pipeline (generateEnhanced)
+                const { contract: _rawContract } = await orchestrator.generateEnhanced(
+                    synthesisConfig,
+                    log,
+                    (progress: StageProgress) => {
+                        setStageProgress(progress);
+                        
+                        if (progress.stage === 'outline') {
+                            store.updateJobState(targetId, { phase: 'outline_generation' });
+                        } else if (progress.stage === 'sections') {
+                            store.updateJobState(targetId, { phase: 'section_drafts' });
+                        } else if (progress.stage === 'merge') {
+                            store.updateJobState(targetId, { phase: 'merge_content' });
+                        } else if (progress.stage === 'polish') {
+                            store.updateJobState(targetId, { phase: 'final_polish' });
                         }
-                    );
-
-
-
-
-                    // 🔥🔥🔥 CRITICAL FIX: Create MUTABLE deep copy to avoid Immer freeze
-                    let contract: ContentContract = deepClone(_rawContract);
-
-                    // Post-processing
-                    contract.htmlContent = removeH1TagsFromContent(contract.htmlContent, log);
-                    
-                    if (contract.title) contract.title = enforceTitle(contract.title, log);
-                    if (contract.metaDescription) contract.metaDescription = enforceMeta(contract.metaDescription, log);
-
-                    const { html: cleanedQAHtml } = cleanupQAFormatFromContent(contract.htmlContent, log);
-                    contract.htmlContent = cleanedQAHtml;
-
-                    contract.htmlContent = removeDuplicateFAQSections(contract.htmlContent, log);
-
-                    if (contract.faqs && contract.faqs.length > 0 && !hasPremiumFAQStyling(contract.htmlContent)) {
-                        contract.htmlContent = upgradeFAQSection(contract.htmlContent, contract.faqs);
-                        log(`   ✅ Upgraded FAQ section with ${contract.faqs.length} premium-styled questions`);
-                                        } else if (hasPremiumFAQStyling(contract.htmlContent)) {
-                        log(`   ✓ FAQ section already has premium styling — skipping duplicate upgrade`);
                     }
+                );
 
-                    // ═══════════════════════════════════════════════════════════════════════════
-                    // 🔗 INTERNAL LINK INJECTION — SOTA PIPELINE
-                    // ═══════════════════════════════════════════════════════════════════════════
-                    
-                    log(`🔗 Discovering and injecting internal links...`, true);
+                // 🔥 CRITICAL: Deep clone to avoid Immer freeze
+                let contract: ContentContract = deepClone(_rawContract);
+
+                // Post-processing
+                contract.htmlContent = removeH1TagsFromContent(contract.htmlContent, log);
+                if (contract.title) contract.title = enforceTitle(contract.title, log);
+                if (contract.metaDescription) contract.metaDescription = enforceMeta(contract.metaDescription, log);
+                contract.htmlContent = removeDuplicateFAQSections(contract.htmlContent, log);
+
+                // Inject internal links
+                if (internalLinks.length > 0) {
+                    log(`🔗 Injecting internal links...`);
                     
                     try {
                         const wpLinkTargets = await discoverInternalLinkTargets(
                             store.wpConfig.url,
                             auth,
-                            { 
-                                excludePostId: postId || undefined, 
-                                excludeUrls: [targetId], 
-                                maxPosts: 100 
-                            },
-                            (msg) => log(msg)
+                            { excludePostId: postId || undefined, excludeUrls: [targetId], maxPosts: 100 },
+                            log
                         );
                         
-                        const seenUrls = new Set(wpLinkTargets.map(t => t.url.toLowerCase()));
-                        const storeLinkTargets = internalLinks
-                            .filter(l => !seenUrls.has(l.url.toLowerCase()))
-                            .slice(0, 30);
+                        const allLinkTargets = [...wpLinkTargets, ...internalLinks.slice(0, 30)];
                         
-                        const allLinkTargets = [...wpLinkTargets, ...storeLinkTargets];
+                        const linkResult = injectInternalLinks(
+                            contract.htmlContent,
+                            allLinkTargets,
+                            targetId,
+                            { minLinks: 12, maxLinks: 20, minRelevance: 0.55 }
+                        );
                         
-                        log(`   📋 Link targets: ${wpLinkTargets.length} from WP + ${storeLinkTargets.length} from store = ${allLinkTargets.length} total`);
+                        contract.htmlContent = linkResult.html;
+                        contract.internalLinks = linkResult.linksAdded;
                         
-                        if (allLinkTargets.length > 0 && contract.htmlContent) {
-                            const linkResult = injectInternalLinks(
-                                contract.htmlContent,
-                                allLinkTargets,
-                                targetId,
-                                {
-                                    minLinks: 12,
-                                    maxLinks: 25,
-                                    minRelevance: 0.55,
-                                    minDistanceBetweenLinks: 450,
-                                    maxLinksPerSection: 2
-                                }
-                            );
-                            
-                            contract.htmlContent = linkResult.html;
-                            contract.internalLinks = linkResult.linksAdded;
-                            
-                            log(`   ✅ Injected ${linkResult.linksAdded.length} internal links`, true);
-                            
-                            const excellent = linkResult.linksAdded.filter(l => l.relevanceScore >= 0.8).length;
-                            const good = linkResult.linksAdded.filter(l => l.relevanceScore >= 0.6 && l.relevanceScore < 0.8).length;
-                            const acceptable = linkResult.linksAdded.filter(l => l.relevanceScore < 0.6).length;
-                            log(`   📊 Quality: ${excellent} excellent | ${good} good | ${acceptable} acceptable`, true);
-                        } else {
-                            log(`   ⚠️ No link targets available`, true);
-                        }
+                        log(`   ✅ Injected ${linkResult.linksAdded.length} internal links`);
                     } catch (linkErr: any) {
-                        log(`   ⚠️ Link injection failed: ${linkErr.message}`, true);
-                        
-                        if (internalLinks.length > 0 && contract.htmlContent) {
-                            log(`   🔄 Fallback: Using store pages...`, true);
-                            const fallbackResult = injectInternalLinks(
-                                contract.htmlContent,
-                                internalLinks,
-                                targetId,
-                                { minLinks: 6, maxLinks: 15, minRelevance: 0.4 }
-                            );
-                            contract.htmlContent = fallbackResult.html;
-                            contract.internalLinks = fallbackResult.linksAdded;
-                            log(`   ✅ Fallback injected ${fallbackResult.linksAdded.length} links`, true);
-                        }
-                    }
-
-
-
-                    logContentStructure(contract.htmlContent, log);
-
-                    const finalDoc = new DOMParser().parseFromString(contract.htmlContent, 'text/html');
-                    const finalWordCount = (finalDoc.body?.textContent || '').split(/\s+/).filter(Boolean).length;
-                    contract.wordCount = finalWordCount;
-
-                    log(`   ✅ SOTA Pipeline Complete: ${finalWordCount.toLocaleString()} words | ${contract.faqs?.length || 0} FAQs`, true);
-
-                    // 🔥 CRITICAL FIX: Store a SEPARATE deep copy to state
-                    store.updateJobState(targetId, { contract: deepClone(contract) });
-
-                    // QA Validation
-                    store.updateJobState(targetId, { phase: 'qa_validation' });
-                    log(`🔍 QA Validation...`);
-
-                    const qaResult = runQASwarm(contract, entityGapData, store.neuronTerms);
-                    store.updateJobState(targetId, { qaResults: qaResult.results });
-
-                    const criticalFails = qaResult.results.filter(r => r.status === 'failed' && r.category === 'critical');
-                    const qaPatternCount = countQAPatternsOutsideFAQ(contract.htmlContent);
-                    
-                    if (qaPatternCount > 5) {
-                        log(`   ⚠️ WARNING: ${qaPatternCount} Q&A patterns detected in main content (should be prose)`, true);
-                    }
-                    
-                    log(`   📊 QA Score: ${qaResult.score}/100 | Words: ${finalWordCount.toLocaleString()} | Critical Fails: ${criticalFails.length} | Q&A Patterns: ${qaPatternCount}`, true);
-
-                    // 🔥 CRITICAL FIX: Create independent copy for bestContract
-                    bestContract = deepClone(contract);
-                    bestScore = qaResult.score;
-                    bestWordCount = finalWordCount;
-                    qaPassed = true;
-                    log(`   ✅ QA PASSED (SOTA Pipeline)`, true);
-
-                } catch (genErr: any) {
-                    lastSynthesisError = genErr.message;
-                    log(`   ❌ SOTA Pipeline failed: ${genErr.message}`, true);
-                    log(`   → Falling back to standard generation...`, true);
-                }
-            }
-
-            // ═══════════════════════════════════════════════════════════════
-            // 🔥 OPTION B: STANDARD GENERATION WITH RETRY LOOP (Fallback)
-            // ═══════════════════════════════════════════════════════════════
-
-            if (!qaPassed) {
-                log(`🎨 Using Standard Generation with Retry Loop...`, true);
-
-                while (synthesisAttempts < MAX_SYNTHESIS_CYCLES && !qaPassed) {
-                    synthesisAttempts++;
-                    store.updateJobState(targetId, { phase: 'content_synthesis' });
-                    log(`🎨 Content Synthesis (Attempt ${synthesisAttempts}/${MAX_SYNTHESIS_CYCLES})...`, true);
-
-                    try {
-                        log(`   → Calling ${store.selectedProvider.toUpperCase()} API...`);
-
-                        const { contract: _rawContract, groundingSources } = await orchestrator.generate({
-                            ...synthesisConfig,
-                            previousAttempts: synthesisAttempts,
-                            allFeedback: allFeedback.length > 0 ? allFeedback : undefined,
-                            temperature: 0.8 + (synthesisAttempts * 0.05)
-                        }, log);
-
-                        // 🔥🔥🔥 CRITICAL FIX: Create MUTABLE deep copy
-                        let contract: ContentContract = deepClone(_rawContract);
-
-                        const initialWordCount = contract.wordCount || 0;
-
-                        log(`   → Generated: ${initialWordCount.toLocaleString()} words | ${contract.faqs?.length || 0} FAQs`, true);
-
-                        if (initialWordCount < 2000) {
-                            lastSynthesisError = `Content too short: ${initialWordCount} words`;
-                            log(`   ❌ ${lastSynthesisError}. Retrying...`, true);
-                            allFeedback.push(`Content was only ${initialWordCount} words. Generate at least ${targetWordCount} words.`);
-                            continue;
-                        }
-
-                        // Post-processing
-                        if (contract.title) contract.title = enforceTitle(contract.title, log);
-                        if (contract.metaDescription) contract.metaDescription = enforceMeta(contract.metaDescription, log);
-
-                        const h1CountBefore = (contract.htmlContent.match(/<h1/gi) || []).length;
-                        if (h1CountBefore > 0) {
-                            contract.htmlContent = contract.htmlContent.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '');
-                            contract.htmlContent = contract.htmlContent.replace(/\n{3,}/g, '\n\n').trim();
-                            log(`   → Removed ${h1CountBefore} H1 tag(s) — WordPress provides title`);
-                        }
-
-                        const { html: cleanedQAHtml } = cleanupQAFormatFromContent(contract.htmlContent, log);
-                        contract.htmlContent = cleanedQAHtml;
-
-                        const hasPremiumFAQ_standard = hasPremiumFAQStyling(contract.htmlContent);
-
-                        if (contract.faqs && contract.faqs.length > 0 && !hasPremiumFAQ_standard) {
-                            contract.htmlContent = upgradeFAQSection(contract.htmlContent, contract.faqs);
-                            log(`   ✅ Upgraded FAQ section with ${contract.faqs.length} premium-styled questions`);
-                        } else if (hasPremiumFAQ_standard) {
-                            log(`   ✓ FAQ section already has premium styling — skipping duplicate upgrade`);
-                        }
-
-                        // ═══════════════════════════════════════════════════════════════════════════
-                        // 🔗 INTERNAL LINK INJECTION — STANDARD PIPELINE
-                        // ═══════════════════════════════════════════════════════════════════════════
-                        
-                        log(`🔗 Discovering and injecting internal links...`, true);
-                        
-                        try {
-                            const wpLinkTargets = await discoverInternalLinkTargets(
-                                store.wpConfig.url,
-                                auth,
-                                { 
-                                    excludePostId: postId || undefined, 
-                                    excludeUrls: [targetId], 
-                                    maxPosts: 100 
-                                },
-                                (msg) => log(msg)
-                            );
-                            
-                            const seenUrls = new Set(wpLinkTargets.map(t => t.url.toLowerCase()));
-                            const storeLinkTargets = internalLinks
-                                .filter(l => !seenUrls.has(l.url.toLowerCase()))
-                                .slice(0, 30);
-                            
-                            const allLinkTargets = [...wpLinkTargets, ...storeLinkTargets];
-                            
-                            log(`   📋 Link targets: ${wpLinkTargets.length} from WP + ${storeLinkTargets.length} from store = ${allLinkTargets.length} total`);
-                            
-                            if (allLinkTargets.length > 0 && contract.htmlContent) {
-                                const linkResult = injectInternalLinks(
-                                    contract.htmlContent,
-                                    allLinkTargets,
-                                    targetId,
-                                    {
-                                        minLinks: 12,
-                                        maxLinks: 25,
-                                        minRelevance: 0.55,
-                                        minDistanceBetweenLinks: 450,
-                                        maxLinksPerSection: 2
-                                    }
-                                );
-                                
-                                contract.htmlContent = linkResult.html;
-                                contract.internalLinks = linkResult.linksAdded;
-                                
-                                log(`   ✅ Injected ${linkResult.linksAdded.length} internal links`, true);
-                                
-                                const excellent = linkResult.linksAdded.filter(l => l.relevanceScore >= 0.8).length;
-                                const good = linkResult.linksAdded.filter(l => l.relevanceScore >= 0.6 && l.relevanceScore < 0.8).length;
-                                const acceptable = linkResult.linksAdded.filter(l => l.relevanceScore < 0.6).length;
-                                log(`   📊 Quality: ${excellent} excellent | ${good} good | ${acceptable} acceptable`, true);
-                            } else {
-                                log(`   ⚠️ No link targets available`, true);
-                            }
-                        } catch (linkErr: any) {
-                            log(`   ⚠️ Link injection failed: ${linkErr.message}`, true);
-                            
-                            if (internalLinks.length > 0 && contract.htmlContent) {
-                                log(`   🔄 Fallback: Using store pages...`, true);
-                                const fallbackResult = injectInternalLinks(
-                                    contract.htmlContent,
-                                    internalLinks,
-                                    targetId,
-                                    { minLinks: 6, maxLinks: 15, minRelevance: 0.4 }
-                                );
-                                contract.htmlContent = fallbackResult.html;
-                                contract.internalLinks = fallbackResult.linksAdded;
-                                log(`   ✅ Fallback injected ${fallbackResult.linksAdded.length} links`, true);
-                            }
-                        }
-
-
-
-                        logContentStructure(contract.htmlContent, log);
-
-                        const finalDoc = new DOMParser().parseFromString(contract.htmlContent, 'text/html');
-                        const finalWordCount = (finalDoc.body?.textContent || '').split(/\s+/).filter(Boolean).length;
-                        contract.wordCount = finalWordCount;
-
-                        // 🔥 CRITICAL FIX: Store a SEPARATE deep copy to state
-                        store.updateJobState(targetId, { contract: deepClone(contract) });
-
-                        // QA Validation
-                        store.updateJobState(targetId, { phase: 'qa_validation' });
-                        log(`🔍 QA Validation...`);
-
-                        const qaResult = runQASwarm(contract, entityGapData, store.neuronTerms);
-                        store.updateJobState(targetId, { qaResults: qaResult.results });
-
-                        const criticalFails = qaResult.results.filter(r => r.status === 'failed' && r.category === 'critical');
-                        const qaPatternCount = countQAPatternsOutsideFAQ(contract.htmlContent);
-                        
-                        if (qaPatternCount > 5) {
-                            log(`   ⚠️ WARNING: ${qaPatternCount} Q&A patterns detected in main content (should be prose)`, true);
-                        }
-                        
-                        log(`   📊 QA Score: ${qaResult.score}/100 | Words: ${finalWordCount.toLocaleString()} | Critical Fails: ${criticalFails.length} | Q&A Patterns: ${qaPatternCount}`, true);
-
-                        // 🔥 CRITICAL FIX: Create independent copies for bestContract
-                        if (qaResult.score > bestScore || (qaResult.score === bestScore && finalWordCount > bestWordCount)) {
-                            bestScore = qaResult.score;
-                            bestContract = deepClone(contract);
-                            bestWordCount = finalWordCount;
-                        }
-
-                        if (qaResult.score >= QA_PASS_THRESHOLD && criticalFails.length <= 2) {
-                            qaPassed = true;
-                            log(`   ✅ QA PASSED`, true);
-                        } else if (synthesisAttempts < MAX_SYNTHESIS_CYCLES) {
-                            store.updateJobState(targetId, { phase: 'self_improvement' });
-                            const newFeedback = criticalFails.slice(0, 3).map(r => r.fixSuggestion || r.feedback);
-                            allFeedback = [...allFeedback, ...newFeedback].slice(-8);
-                            store.updateJobState(targetId, { allFeedback });
-                            log(`   🔄 Retrying with ${newFeedback.length} fixes...`);
-                            await new Promise(r => setTimeout(r, 500));
-                        } else {
-                            log(`   ⚠️ Max attempts reached. Using best (Score: ${bestScore})`, true);
-                            if (bestContract && bestScore >= 50) {
-                                store.updateJobState(targetId, { contract: deepClone(bestContract) });
-                                qaPassed = true;
-                            }
-                        }
-                    } catch (genErr: any) {
-                        lastSynthesisError = genErr.message;
-                        log(`   ❌ Generation error: ${genErr.message}`, true);
-                        
-                        const isRateLimit = genErr.message.includes('429') || genErr.message.toLowerCase().includes('rate limit');
-                        const isTimeout = genErr.message.toLowerCase().includes('timeout');
-                        
-                        if (synthesisAttempts >= MAX_SYNTHESIS_CYCLES) {
-                            if (bestContract && bestScore >= 40) {
-                                log(`   → Using best available content (Score: ${bestScore})`, true);
-                                store.updateJobState(targetId, { contract: deepClone(bestContract) });
-                                qaPassed = true;
-                            } else {
-                                throw new Error(`Content generation failed after ${MAX_SYNTHESIS_CYCLES} attempts: ${genErr.message}`);
-                            }
-                        } else {
-                            allFeedback.push(`Previous attempt failed: ${genErr.message}`);
-                            
-                            const baseDelay = isRateLimit ? 5000 : isTimeout ? 3000 : 2000;
-                            const exponentialDelay = baseDelay * Math.pow(2, synthesisAttempts - 1);
-                            const jitter = Math.random() * 1000;
-                            const finalDelay = Math.min(exponentialDelay + jitter, 30000);
-                            
-                            log(`   ⏳ Waiting ${Math.round(finalDelay / 1000)}s before retry...`);
-                            await new Promise(r => setTimeout(r, finalDelay));
-                        }
+                        log(`   ⚠️ Link injection failed: ${linkErr.message}`);
                     }
                 }
+
+                // Calculate word count
+                const finalDoc = new DOMParser().parseFromString(contract.htmlContent, 'text/html');
+                const finalWordCount = (finalDoc.body?.textContent || '').split(/\s+/).filter(Boolean).length;
+                contract.wordCount = finalWordCount;
+
+                log(`   ✅ Content generated: ${finalWordCount.toLocaleString()} words`);
+
+                // Store contract
+                store.updateJobState(targetId, { contract: deepClone(contract) });
+
+                // QA Validation
+                store.updateJobState(targetId, { phase: 'qa_validation' });
+                log(`🔍 QA Validation...`);
+
+                const qaResult = runQASwarm(contract, entityGapData, store.neuronTerms);
+                store.updateJobState(targetId, { qaResults: qaResult.results });
+                
+                log(`   📊 QA Score: ${qaResult.score}/100 | Words: ${finalWordCount.toLocaleString()}`);
+
+                bestContract = deepClone(contract);
+                bestScore = qaResult.score;
+                bestWordCount = finalWordCount;
+
+            } catch (genErr: any) {
+                log(`   ❌ Content generation failed: ${genErr.message}`);
+                throw genErr;
             }
 
-            // ═══════════════════════════════════════════════════════════════
-            // 🔥 FINAL VALIDATION — Get the contract to publish
-            // ═══════════════════════════════════════════════════════════════
-
-            // 🔥🔥🔥 CRITICAL FIX: Create MUTABLE copy for final processing
-            const finalContract: ContentContract | null = bestContract 
-                ? deepClone(bestContract) 
-                : null;
-
-            if (!finalContract || !finalContract.htmlContent || finalContract.htmlContent.length < 2000) {
-                throw new Error(`Content generation failed: ${lastSynthesisError || 'No valid content produced'}`);
+            // Final validation
+            if (!bestContract || !bestContract.htmlContent || bestContract.htmlContent.length < 2000) {
+                throw new Error('Content generation failed: No valid content produced');
             }
 
             // Final H1 check
-            const h1FinalCheck = (finalContract.htmlContent.match(/<h1/gi) || []).length;
+            const h1FinalCheck = (bestContract.htmlContent.match(/<h1/gi) || []).length;
             if (h1FinalCheck > 0) {
-                log(`   ⚠️ Final H1 cleanup: removing ${h1FinalCheck} remaining H1 tag(s)`, true);
-                finalContract.htmlContent = finalContract.htmlContent.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '');
+                log(`   ⚠️ Final H1 cleanup: removing ${h1FinalCheck} remaining H1 tag(s)`);
+                bestContract.htmlContent = bestContract.htmlContent.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '');
             }
 
-            // Final Q&A cleanup
-            const finalQAPatterns = countQAPatternsOutsideFAQ(finalContract.htmlContent);
-            if (finalQAPatterns > 10) {
-                log(`   ⚠️ Final Q&A cleanup: ${finalQAPatterns} patterns found, cleaning...`, true);
-                const { html: finalCleanedHtml } = cleanupQAFormatFromContent(finalContract.htmlContent, log);
-                finalContract.htmlContent = finalCleanedHtml;
-            }
-
-            log(`✅ Phase 5 Complete: ${bestWordCount.toLocaleString()} words | Score: ${bestScore}%`, true);
-
-            // ═══════════════════════════════════════════════════════════════════════════
-            // 🎬 YOUTUBE VIDEO INTEGRATION — NEW PHASE 5.5
-            // ═══════════════════════════════════════════════════════════════════════════
-
-            if (store.apiKeys.serper && finalContract) {
-                store.updateJobState(targetId, { phase: 'youtube_integration' as GodModePhase });
-                log(`🎬 PHASE 5.5: YouTube Video Integration...`, true);
-                
-                try {
-                    const { searchYouTubeVideo, generateYouTubeEmbed } = await import('./utils');
-                    
-                    const videoResult = await searchYouTubeVideo(
-                        topic,
-                        store.apiKeys.serper,
-                        { minViews: 10000 },
-                        (msg: string) => log(msg)
-                    );
-                    
-                    if (videoResult.video) {
-                        const videoEmbed = generateYouTubeEmbed(videoResult.video, topic);
-                        
-                        // Insert after Quick Answer box OR after first H2 section
-                        const quickAnswerEnd = finalContract.htmlContent.indexOf('</div>', 
-                            finalContract.htmlContent.toLowerCase().indexOf('quick answer')
-                        );
-                        const firstH2 = finalContract.htmlContent.indexOf('<h2');
-                        
-                        let insertPos = -1;
-                        
-                        if (quickAnswerEnd > 0 && quickAnswerEnd < 2000) {
-                            // Insert after Quick Answer closing div
-                            insertPos = quickAnswerEnd + 6; // length of '</div>'
-                            log(`   → Inserting video after Quick Answer box`);
-                        } else if (firstH2 > 0) {
-                            // Insert before first H2
-                            insertPos = firstH2;
-                            log(`   → Inserting video before first H2`);
-                        }
-                        
-                        if (insertPos > 0) {
-                            finalContract.htmlContent = 
-                                finalContract.htmlContent.slice(0, insertPos) + 
-                                '\n\n' + videoEmbed + '\n\n' +
-                                finalContract.htmlContent.slice(insertPos);
-                            
-                            log(`   ✅ Embedded video: "${videoResult.video.title}"`, true);
-                            log(`   📊 Video stats: ${videoResult.video.channel} • ${videoResult.video.views.toLocaleString()} views`);
-                        } else {
-                            log(`   ⚠️ Could not find suitable insertion point for video`);
-                        }
-                    } else {
-                        log(`   ⚠️ No suitable YouTube video found for topic`);
-                    }
-                } catch (ytErr: any) {
-                    log(`   ⚠️ YouTube integration failed: ${ytErr.message}`, true);
-                }
-            } else if (!store.apiKeys.serper) {
-                log(`⚠️ Skipping YouTube integration (no Serper API key)`, true);
-            }
-
-            // ═══════════════════════════════════════════════════════════════════════════
-            // PRE-PUBLISH VALIDATION — CRITICAL CHECKS
-            // ═══════════════════════════════════════════════════════════════════════════
-            
-            log(`🔍 Running pre-publish validation...`, true);
-
-            
-            const h1ValidationResult = validateContentNoH1(finalContract.htmlContent);
-            if (!h1ValidationResult.valid) {
-                log(`   ⚠️ CRITICAL: ${h1ValidationResult.count} H1 tags detected — forcing removal...`, true);
-                finalContract.htmlContent = removeH1TagsFromContent(finalContract.htmlContent, log);
-                
-                const recheck = validateContentNoH1(finalContract.htmlContent);
-                if (!recheck.valid) {
-                    throw new Error(`Cannot publish: H1 tags still present after cleanup (${recheck.count})`);
-                }
-            }
-            
-            const prePublishDoc = new DOMParser().parseFromString(finalContract.htmlContent, 'text/html');
-            const prePublishWordCount = (prePublishDoc.body?.textContent || '').split(/\s+/).filter(Boolean).length;
-            
-            if (prePublishWordCount < 2000) {
-                throw new Error(`Content too short: ${prePublishWordCount} words (minimum: 2000)`);
-            }
-            
-            if (!finalContract.title || finalContract.title.trim().length < 10) {
-                throw new Error('Title is missing or too short (minimum 10 characters)');
-            }
-            
-            if (!finalContract.htmlContent || finalContract.htmlContent.trim().length < 1000) {
-                throw new Error('HTML content is empty or too short');
-            }
-            
-            finalContract.htmlContent = removeDuplicateFAQs(finalContract.htmlContent, log);
-            
-            log(`   ✅ Pre-publish validation PASSED:`, true);
-            log(`      • Words: ${prePublishWordCount.toLocaleString()}`, true);
-            log(`      • H1 tags: 0`, true);
-            log(`      • Title: "${finalContract.title.substring(0, 50)}..."`, true);
+            log(`✅ Phase 5 Complete: ${bestWordCount.toLocaleString()} words | Score: ${bestScore}%`);
 
             // ═══════════════════════════════════════════════════════════════
             // PHASE 6: PUBLISH TO WORDPRESS
             // ═══════════════════════════════════════════════════════════════
 
             store.updateJobState(targetId, { phase: 'publishing' });
-            log(`📤 PHASE 6: Publishing to WordPress...`, true);
+            log(`📤 PHASE 6: Publishing to WordPress...`);
 
             const publishData: any = {
-                title: finalContract.title,
-                content: finalContract.htmlContent,
-                excerpt: finalContract.excerpt || '',
+                title: bestContract.title,
+                content: bestContract.htmlContent,
+                excerpt: bestContract.excerpt || '',
                 status: store.publishMode === 'autopublish' ? 'publish' : 'draft'
             };
 
@@ -2048,76 +1071,37 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             let finalPostLink: string;
 
             if (postId) {
-                log(`   → 🔒 UPDATING existing post ID: ${postId}`);
-                
-                const currentPostUrl = await wpGetPostFullUrl(store.wpConfig.url, postId, auth);
-                if (currentPostUrl) {
-                    log(`   → 🔒 Current URL: ${currentPostUrl}`);
-                    log(`   → 🔒 This URL will be PRESERVED (slug not changing)`);
-                }
-                
-                delete publishData.slug;
+                log(`   → Updating existing post ID: ${postId}`);
                 
                 if (preserveCategories && preservation.originalCategories.length > 0) {
                     publishData.categories = preservation.originalCategories;
-                    log(`   → 🔒 Preserving ${preservation.originalCategories.length} categories`);
                 }
-                
                 if (preserveTags && preservation.originalTags.length > 0) {
                     publishData.tags = preservation.originalTags;
-                    log(`   → 🔒 Preserving ${preservation.originalTags.length} tags`);
                 }
-                
                 if (preserveFeaturedImage && preservation.featuredImageId) {
                     publishData.featured_media = preservation.featuredImageId;
-                    log(`   → 🖼️ Preserving featured image (ID: ${preservation.featuredImageId})`);
                 }
                 
-                log(`   → 📦 Update payload keys: ${Object.keys(publishData).join(', ')}`);
+                const result = await wpUpdatePost(store.wpConfig.url, auth, postId, publishData, {
+                    preserveFeaturedImage,
+                    preserveSlug: true,
+                    preserveCategories,
+                    preserveTags
+                });
                 
-                try {
-                    const result = await wpUpdatePost(store.wpConfig.url, auth, postId, publishData, {
-                        preserveFeaturedImage: preserveFeaturedImage,
-                        preserveSlug: true,
-                        preserveCategories: preserveCategories,
-                        preserveTags: preserveTags
-                    });
-                    
-                    finalPostId = result.id;
-                    finalPostLink = result.link;
-                    
-                    log(`   ✅ Updated post ID: ${finalPostId}`, true);
-                    log(`   → Final URL: ${finalPostLink}`, true);
-                    
-                    const originalPath = new URL(targetId).pathname;
-                    const finalPath = new URL(finalPostLink).pathname;
-                    
-                    if (originalPath !== finalPath) {
-                        log(`   ⚠️ WARNING: URL may have changed!`, true);
-                        log(`   ⚠️ Original: ${originalPath}`, true);
-                        log(`   ⚠️ Final: ${finalPath}`, true);
-                        store.addToast('⚠️ URL may have changed — verify in WordPress', 'warning');
-                    } else {
-                        log(`   ✅ URL preserved correctly`, true);
-                    }
-                    
-                } catch (wpErr: any) {
-                    throw new Error(`WordPress update failed: ${wpErr.message}`);
-                }
+                finalPostId = result.id;
+                finalPostLink = result.link;
                 
+                log(`   ✅ Updated post ID: ${finalPostId}`);
             } else {
-                publishData.slug = finalContract.slug;
-                log(`   → 📝 Creating NEW post with slug: "${finalContract.slug}"`);
+                publishData.slug = bestContract.slug;
+                log(`   → Creating NEW post with slug: "${bestContract.slug}"`);
                 
-                try {
-                    const result = await wpCreatePost(store.wpConfig.url, auth, publishData);
-                    finalPostId = result.id;
-                    finalPostLink = result.link;
-                    log(`   ✅ Created NEW post ID: ${finalPostId}`, true);
-                    log(`   → New URL: ${finalPostLink}`, true);
-                } catch (wpErr: any) {
-                    throw new Error(`WordPress create failed: ${wpErr.message}`);
-                }
+                const result = await wpCreatePost(store.wpConfig.url, auth, publishData);
+                finalPostId = result.id;
+                finalPostLink = result.link;
+                log(`   ✅ Created NEW post ID: ${finalPostId}`);
             }
 
             store.updateJobState(targetId, { postId: finalPostId });
@@ -2125,70 +1109,27 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             // Update SEO meta
             try {
                 await wpUpdatePostMeta(store.wpConfig.url, auth, finalPostId, {
-                    title: finalContract.title,
-                    description: finalContract.metaDescription,
+                    title: bestContract.title,
+                    description: bestContract.metaDescription,
                     focusKeyword: topic
                 });
                 log(`   ✅ SEO meta updated`);
-            } catch (e) {
-                log(`   ⚠️ Could not update SEO meta`);
-            }
-
-            // Optimize alt text
-            if (optimizeAltText && preservation.contentImages.length > 0) {
-                log(`🖼️ Optimizing alt text for ${preservation.contentImages.length} images...`);
-                
-                try {
-                    const apiKey = store.apiKeys.google || store.apiKeys.openrouter;
-                    
-                    if (apiKey && typeof generateOptimizedAltText === 'function') {
-                        const optimizedAlts = await generateOptimizedAltText(
-                            preservation.contentImages.map(img => ({ src: img.src, alt: img.alt })),
-                            topic,
-                            apiKey
-                        );
-                        
-                        let updatedCount = 0;
-                        for (const optimized of optimizedAlts) {
-                            if (optimized.optimizedAlt && optimized.optimizedAlt !== optimized.originalAlt) {
-                                const img = preservation.contentImages.find(i => i.src === optimized.src);
-                                if (img?.mediaId) {
-                                    const success = await wpUpdateMediaAltText(
-                                        store.wpConfig.url, 
-                                        auth, 
-                                        img.mediaId, 
-                                        optimized.optimizedAlt
-                                    );
-                                    if (success) {
-                                        updatedCount++;
-                                        log(`   ✅ Updated alt: "${optimized.optimizedAlt.substring(0, 40)}..."`);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (updatedCount > 0) {
-                            log(`   🖼️ Optimized ${updatedCount} image alt texts`);
-                        }
-                    }
-                } catch (altErr: any) {
-                    log(`   ⚠️ Alt text optimization failed: ${altErr.message}`);
-                }
-            }
+            } catch {}
 
             // ═══════════════════════════════════════════════════════════════
             // PHASE 7: COMPLETION
             // ═══════════════════════════════════════════════════════════════
             
             store.updateJobState(targetId, { phase: 'completed' });
+            setStageProgress(null);
             
             const metrics = calculateSeoMetrics(
-                finalContract.htmlContent, 
-                finalContract.title || topic, 
-                finalContract.slug || ''
+                bestContract.htmlContent, 
+                bestContract.title || topic, 
+                bestContract.slug || ''
             );
             
-            const finalQA = runQASwarm(finalContract, entityGapData, store.neuronTerms);
+            const finalQA = runQASwarm(bestContract, entityGapData, store.neuronTerms);
             const finalScore = Math.round(
                 (metrics.aeoScore * 0.25) + 
                 (finalQA.score * 0.45) + 
@@ -2227,18 +1168,13 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 totalImproved: (store.globalStats.totalImproved || 0) + (finalScore >= 70 ? 1 : 0)
             });
 
-            log(`🎉 ═══════════════════════════════════════════════════════════`, true);
-            log(`🎉 SUCCESS: Score ${finalScore}% | ${metrics.wordCount.toLocaleString()} words | ${formatDuration(processingTime)}`, true);
-            log(`🎉 Images preserved: ${preservation.contentImages.length} | Featured: ${preservation.featuredImageId ? 'Yes' : 'No'}`, true);
-            log(`🎉 ═══════════════════════════════════════════════════════════`, true);
+            log(`🎉 ═══════════════════════════════════════════════════════════`);
+            log(`🎉 SUCCESS: Score ${finalScore}% | ${metrics.wordCount.toLocaleString()} words | ${formatDuration(processingTime)}`);
+            log(`🎉 ═══════════════════════════════════════════════════════════`);
             
-            if (!silentMode) store.addToast(`✅ Optimized! Score: ${finalScore}% | ${metrics.wordCount.toLocaleString()} words`, 'success');
+            if (!silentMode) store.addToast(`✅ Optimized! Score: ${finalScore}%`, 'success');
             
-            return { 
-                success: true, 
-                score: finalScore, 
-                wordCount: metrics.wordCount 
-            };
+            return { success: true, score: finalScore, wordCount: metrics.wordCount };
 
         } catch (e: any) {
             const processingTime = Date.now() - startTime;
@@ -2251,23 +1187,21 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 processingTime
             });
             store.updatePage(targetId!, { status: 'error' });
+            setStageProgress(null);
             
-            log(`💥 ═══════════════════════════════════════════════════════════`, true);
-            log(`💥 FAILED: ${errorMessage}`, true);
-            log(`💥 Time: ${formatDuration(processingTime)}`, true);
-            log(`💥 ═══════════════════════════════════════════════════════════`, true);
+            log(`💥 FAILED: ${errorMessage}`);
             
             if (!silentMode) store.addToast(`❌ Failed: ${errorMessage}`, 'error');
             
-            return { 
-                success: false, 
-                score: 0, 
-                wordCount: 0, 
-                error: errorMessage 
-            };
+            return { success: false, score: 0, wordCount: 0, error: errorMessage };
         }
 
-    }, [manualUrl, store, getSiteContext, getAuth, geoConfig, hasRequiredKeys, targetKeywordOverride, getActualModel, enforceTitle, enforceMeta, optimizationMode, preserveImages, optimizeAltText, preserveFeaturedImage, preserveCategories, preserveTags, hasSerperKey, hasNeuronConfig]);
+    }, [
+        manualUrl, store, getSiteContext, getAuth, geoConfig, hasRequiredKeys, 
+        targetKeywordOverride, getActualModel, enforceTitle, enforceMeta, 
+        optimizationMode, preserveImages, optimizeAltText, preserveFeaturedImage, 
+        preserveCategories, preserveTags, hasNeuronConfig, resetCancellationToken
+    ]);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // BULK OPTIMIZATION
@@ -2294,18 +1228,13 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             return;
         }
 
-        if (!store.wpConfig.url || !store.wpConfig.password) {
-            store.addToast('Configure WordPress connection', 'error');
-            return;
-        }
-
         bulkAbortRef.current = false;
         const startTime = Date.now();
 
         const jobs: BulkJob[] = urls.map((url, index) => ({
             id: `bulk-${Date.now()}-${index}`,
             url,
-            status: 'queued',
+            status: 'queued' as const,
             progress: 0,
             attempts: 0
         }));
@@ -2321,80 +1250,32 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             totalWords: 0
         });
 
-        store.addGodLog(`════════════════════════════════════════════════════════════════════════`);
-        store.addGodLog(`🚀 BULK OPTIMIZATION ENGINE v${APP_VERSION_FULL}`);
-        store.addGodLog(`════════════════════════════════════════════════════════════════════════`);
-        store.addGodLog(`📋 URLs to process: ${urls.length}`);
-        store.addGodLog(`⚡ Parallel jobs: ${bulkConcurrency}`);
-        store.addGodLog(`🎯 Mode: ${optimizationMode.toUpperCase()}`);
-        store.addGodLog(`────────────────────────────────────────────────────────────────────────`);
-
-        const newPages: SitemapPage[] = urls
-            .filter(url => !store.pages.find(p => p.id === url))
-            .map(url => {
-                const slug = sanitizeSlug(extractSlugFromUrl(url));
-                let title = '';
-                try {
-                    const pathParts = new URL(url).pathname.split('/').filter(Boolean);
-                    if (pathParts.length > 0) {
-                        title = pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    }
-                } catch {}
-                if (!title || title.length < 3) title = 'New Page';
-                
-                return {
-                    id: url,
-                    title,
-                    slug,
-                    lastMod: new Date().toISOString(),
-                    wordCount: null,
-                    crawledContent: null,
-                    healthScore: null,
-                    status: 'idle' as const,
-                    opportunity: calculateOpportunityScore(title, null),
-                    improvementHistory: []
-                };
-            });
-
-        if (newPages.length > 0) {
-            store.addPages(newPages);
-        }
+        store.addGodLog(`🚀 BULK OPTIMIZATION: ${urls.length} URLs | Concurrency: ${bulkConcurrency}`);
 
         let completed = 0;
         let failed = 0;
         let totalWords = 0;
         let totalScore = 0;
-        const results: BulkResult[] = [];
 
         const processJob = async (job: BulkJob): Promise<void> => {
             if (bulkAbortRef.current) return;
 
             const jobStartTime = Date.now();
-            const urlShort = job.url.split('/').slice(-2).join('/').substring(0, 50);
 
             setBulkState(prev => ({
                 ...prev,
-                jobs: prev.jobs.map(j => j.id === job.id ? { 
-                    ...j, 
-                    status: 'processing', 
-                    startTime: jobStartTime
-                } : j)
+                jobs: prev.jobs.map(j => j.id === job.id ? { ...j, status: 'processing' as const, startTime: jobStartTime } : j)
             }));
 
-            store.addGodLog(`────────────────────────────────────────────────────────────────────────`);
-            store.addGodLog(`⚡ [${completed + failed + 1}/${jobs.length}] STARTING: ${urlShort}`);
-
             try {
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('Job timeout (25 min exceeded)')), JOB_TIMEOUT_MS);
-                });
-
-                const resultPromise = executeGodMode(job.url, true);
-                const result = await Promise.race([resultPromise, timeoutPromise]);
+                const result = await Promise.race([
+                    executeGodMode(job.url, true),
+                    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Job timeout')), JOB_TIMEOUT_MS))
+                ]);
                 
                 const jobTime = Date.now() - jobStartTime;
                 
-                if (result.success && result.score >= 50 && result.wordCount > 1000) {
+                if (result.success && result.score >= 50) {
                     completed++;
                     totalWords += result.wordCount;
                     totalScore += result.score;
@@ -2403,7 +1284,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         ...prev,
                         jobs: prev.jobs.map(j => j.id === job.id ? { 
                             ...j, 
-                            status: 'completed',
+                            status: 'completed' as const,
                             score: result.score,
                             wordCount: result.wordCount,
                             endTime: Date.now()
@@ -2413,54 +1294,33 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         avgScore: Math.round(totalScore / completed)
                     }));
 
-                    store.addGodLog(`   ✅ [${completed}/${jobs.length}] SUCCESS: ${urlShort} | Score: ${result.score}% | ${result.wordCount.toLocaleString()} words | ${formatDuration(jobTime)}`);
-                    
-                    results.push({
-                        url: job.url,
-                        success: true,
-                        score: result.score,
-                        time: jobTime,
-                        wordCount: result.wordCount
-                    });
+                    store.addGodLog(`   ✅ ${job.url.split('/').pop()}: ${result.score}% | ${result.wordCount} words`);
                 } else {
                     throw new Error(result.error || 'Quality check failed');
                 }
             } catch (error: any) {
                 failed++;
-                const jobTime = Date.now() - jobStartTime;
                 
                 setBulkState(prev => ({
                     ...prev,
                     jobs: prev.jobs.map(j => j.id === job.id ? { 
                         ...j, 
-                        status: 'failed',
+                        status: 'failed' as const,
                         error: error.message,
                         endTime: Date.now()
                     } : j),
                     failed
                 }));
 
-                store.addGodLog(`   ❌ [${failed}F] FAILED: ${urlShort} | ${error.message} | ${formatDuration(jobTime)}`);
-                
-                results.push({
-                    url: job.url,
-                    success: false,
-                    score: 0,
-                    time: jobTime,
-                    wordCount: 0,
-                    error: error.message
-                });
+                store.addGodLog(`   ❌ ${job.url.split('/').pop()}: ${error.message}`);
             }
         };
 
-        // Process in batches with concurrency control
+        // Process in batches
         for (let i = 0; i < jobs.length; i += bulkConcurrency) {
             if (bulkAbortRef.current) break;
-
             const batch = jobs.slice(i, i + bulkConcurrency);
             await Promise.all(batch.map(job => processJob(job)));
-            
-            // Small delay between batches
             if (i + bulkConcurrency < jobs.length && !bulkAbortRef.current) {
                 await new Promise(r => setTimeout(r, 2000));
             }
@@ -2475,34 +1335,22 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
             avgScore: completed > 0 ? Math.round(totalScore / completed) : 0
         }));
 
-        store.addGodLog(`════════════════════════════════════════════════════════════════════════`);
-        store.addGodLog(`🏁 BULK OPTIMIZATION COMPLETE`);
-        store.addGodLog(`════════════════════════════════════════════════════════════════════════`);
-        store.addGodLog(`📊 Results: ${completed} success | ${failed} failed | ${jobs.length} total`);
-        store.addGodLog(`📝 Total words: ${totalWords.toLocaleString()}`);
-        store.addGodLog(`📈 Avg score: ${completed > 0 ? Math.round(totalScore / completed) : 0}%`);
-        store.addGodLog(`⏱️ Total time: ${formatDuration(totalTime)}`);
-        store.addGodLog(`════════════════════════════════════════════════════════════════════════`);
-
-        store.addToast(
-            `Bulk complete: ${completed}/${jobs.length} success | ${totalWords.toLocaleString()} words | ${formatDuration(totalTime)}`,
-            completed > 0 ? 'success' : 'error'
-        );
-    }, [bulkUrls, bulkConcurrency, store, hasRequiredKeys, executeGodMode, optimizationMode, parseBulkUrls]);
+        store.addGodLog(`🏁 BULK COMPLETE: ${completed}/${jobs.length} success | ${totalWords.toLocaleString()} words | ${formatDuration(totalTime)}`);
+        store.addToast(`Bulk complete: ${completed}/${jobs.length} success`, completed > 0 ? 'success' : 'error');
+    }, [bulkUrls, bulkConcurrency, store, hasRequiredKeys, executeGodMode, parseBulkUrls]);
 
     const abortBulkOptimization = useCallback(() => {
         bulkAbortRef.current = true;
-        store.addGodLog(`⚠️ ABORT REQUESTED — stopping after current jobs complete...`);
+        store.addGodLog(`⚠️ ABORT REQUESTED`);
         store.addToast('Aborting bulk optimization...', 'warning');
     }, [store]);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RENDER — SIMPLIFIED FOR BREVITY (Same as original)
+    // RENDER
     // ═══════════════════════════════════════════════════════════════════════════
 
     return (
         <div className="min-h-screen bg-[#0a0a0f] text-white">
-            {/* Toast Container */}
             <ToastContainer />
             
             {/* Header */}
@@ -2520,7 +1368,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         </div>
                         
                         <div className="flex items-center gap-4">
-                            {/* Navigation tabs */}
+                            {/* Navigation */}
                             <div className="flex bg-white/[0.03] p-1 rounded-xl border border-white/[0.06]">
                                 {(['setup', 'strategy', 'review', 'analytics'] as const).map(view => (
                                     <button
@@ -2542,8 +1390,20 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                 ))}
                             </div>
                             
-                                                        {/* Processing indicator */}
-                            {store.isProcessing && (
+                            {/* Stage Progress Indicator */}
+                            {stageProgress && (
+                                <div className="flex items-center gap-3 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                                    <div className="text-[11px]">
+                                        <span className="font-semibold text-blue-400 uppercase">{stageProgress.stage}</span>
+                                        <span className="text-white/40 ml-2">{stageProgress.message}</span>
+                                    </div>
+                                    <span className="text-[10px] text-blue-400 font-mono">{stageProgress.progress}%</span>
+                                </div>
+                            )}
+                            
+                            {/* Processing Indicator */}
+                            {store.isProcessing && !stageProgress && (
                                 <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                                     <span className="text-[11px] font-semibold text-blue-400 uppercase">
@@ -2552,22 +1412,16 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                 </div>
                             )}
                             
-                            {/* 🔥 CANCEL BUTTON — Stops job after current phase */}
+                            {/* Cancel Button */}
                             {store.isProcessing && (
                                 <button
-                                    onClick={() => {
-                                        cancellationTokenRef.current = { cancelled: true, reason: 'User clicked cancel' };
-                                        store.addGodLog('⛔ CANCELLATION REQUESTED: User clicked cancel button');
-                                        store.addToast('Cancellation requested — will stop after current phase', 'warning');
-                                    }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-all duration-200"
-                                    title="Cancel the current optimization job"
+                                    onClick={() => cancelCurrentJob('User clicked cancel')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/20 transition-all"
                                 >
                                     <span className="text-sm">⛔</span>
                                     <span className="text-[11px] font-semibold uppercase">Cancel</span>
                                 </button>
                             )}
-
                         </div>
                     </div>
                 </div>
@@ -2578,7 +1432,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 {/* Setup View */}
                 {store.activeView === 'setup' && (
                     <div className="space-y-8">
-                        <SectionHeader 
+                        <SectionHeaderComponent 
                             title="Configuration" 
                             icon="⚙️" 
                             color="#0a84ff"
@@ -2587,13 +1441,13 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* WordPress Config */}
-                            <Card padding="lg">
+                            <CardComponent padding="lg">
                                 <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
                                     <span className="text-2xl">🌐</span>
                                     WordPress Connection
                                 </h3>
                                 <div className="space-y-4">
-                                    <AdvancedInput
+                                    <AdvancedInputComponent
                                         label="Site URL"
                                         value={store.wpConfig.url}
                                         onChange={v => store.setWpConfig({ url: v })}
@@ -2601,7 +1455,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         icon="🔗"
                                         required
                                     />
-                                    <AdvancedInput
+                                    <AdvancedInputComponent
                                         label="Username"
                                         value={store.wpConfig.username}
                                         onChange={v => store.setWpConfig({ username: v })}
@@ -2609,7 +1463,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         icon="👤"
                                         required
                                     />
-                                    <AdvancedInput
+                                    <AdvancedInputComponent
                                         label="Application Password"
                                         value={store.wpConfig.password || ''}
                                         onChange={v => store.setWpConfig({ password: v })}
@@ -2636,176 +1490,97 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                          '🔌 Test Connection'}
                                     </button>
                                 </div>
-                            </Card>
+                            </CardComponent>
                             
-                            {/* AI Provider Config — WITH CUSTOM MODEL INPUT */}
-<Card padding="lg">
-    <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
-        <span className="text-2xl">🤖</span>
-        AI Provider Configuration
-    </h3>
-    <div className="space-y-6">
-        {/* Provider Selection */}
-        <div>
-            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-3 block">
-                Select Provider
-            </label>
-            <div className="grid grid-cols-5 gap-2">
-                {(['google', 'openrouter', 'openai', 'anthropic', 'groq'] as const).map(provider => (
-                    <button
-                        key={provider}
-                        onClick={() => store.setSelectedProvider(provider)}
-                        className={cn(
-                            'py-3 px-2 rounded-xl text-[10px] font-semibold uppercase tracking-wider transition-all border',
-                            store.selectedProvider === provider
-                                ? 'bg-white text-black border-white'
-                                : 'bg-white/[0.03] text-white/40 border-white/[0.06] hover:text-white hover:border-white/[0.12]'
-                        )}
-                    >
-                        {provider === 'google' && '🔷 '}
-                        {provider === 'openrouter' && '🌐 '}
-                        {provider === 'openai' && '🟢 '}
-                        {provider === 'anthropic' && '🟠 '}
-                        {provider === 'groq' && '⚡ '}
-                        {provider}
-                    </button>
-                ))}
-            </div>
-        </div>
-        
-        {/* API Key Input */}
-        <AdvancedInput
-            label={`${store.selectedProvider.charAt(0).toUpperCase() + store.selectedProvider.slice(1)} API Key`}
-            value={store.apiKeys[store.selectedProvider]}
-            onChange={v => store.setApiKey(store.selectedProvider, v)}
-            type="password"
-            placeholder="Enter API key..."
-            icon="🔑"
-            required
-        />
-        
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* 🔥🔥🔥 GOOGLE — Standard Model Dropdown */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {store.selectedProvider === 'google' && (
-            <div>
-                <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-2 block">
-                    Gemini Model
-                </label>
-                <select
-                    value={store.selectedModel}
-                    onChange={e => store.setSelectedModel(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none"
-                >
-                    <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash Preview</option>
-                    <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro Preview</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                </select>
-            </div>
-        )}
-        
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* 🔥🔥🔥 OPENROUTER — WITH CUSTOM MODEL INPUT */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {store.selectedProvider === 'openrouter' && (
-            <OpenRouterModelSelector
-                value={store.apiKeys.openrouterModel}
-                onChange={v => store.setApiKey('openrouterModel', v)}
-            />
-        )}
-        
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* 🔥🔥🔥 GROQ — WITH CUSTOM MODEL INPUT */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {store.selectedProvider === 'groq' && (
-            <GroqModelSelector
-                value={store.apiKeys.groqModel}
-                onChange={v => store.setApiKey('groqModel', v)}
-            />
-        )}
-        
-        {/* OpenAI — Fixed Model */}
-        {store.selectedProvider === 'openai' && (
-            <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
-                <div className="flex items-center gap-3">
-                    <span className="text-2xl">🟢</span>
-                    <div>
-                        <div className="text-[14px] font-semibold text-white">GPT-4o</div>
-                        <div className="text-[11px] text-white/40">OpenAI's most capable model</div>
-                    </div>
-                </div>
-            </div>
-        )}
-        
-        {/* Anthropic — Fixed Model */}
-        {store.selectedProvider === 'anthropic' && (
-            <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
-                <div className="flex items-center gap-3">
-                    <span className="text-2xl">🟠</span>
-                    <div>
-                        <div className="text-[14px] font-semibold text-white">Claude Sonnet 4</div>
-                        <div className="text-[11px] text-white/40">Anthropic's latest model</div>
-                    </div>
-                </div>
-            </div>
-        )}
-        
-        {/* Serper API Key (Optional - for all providers) */}
-        <AdvancedInput
-            label="Serper API Key (Optional)"
-            value={store.apiKeys.serper}
-            onChange={v => store.setApiKey('serper', v)}
-            type="password"
-            placeholder="For SERP analysis..."
-            icon="🔍"
-            helpText="Enables entity gap analysis & reference discovery"
-        />
-    </div>
-</Card>
-
+                            {/* AI Provider Config */}
+                            <CardComponent padding="lg">
+                                <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
+                                    <span className="text-2xl">🤖</span>
+                                    AI Provider
+                                </h3>
+                                <div className="space-y-6">
+                                    {/* Provider Selection */}
+                                    <div>
+                                        <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-3 block">
+                                            Select Provider
+                                        </label>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {(['google', 'openrouter', 'openai', 'anthropic', 'groq'] as const).map(provider => (
+                                                <button
+                                                    key={provider}
+                                                    onClick={() => store.setSelectedProvider(provider)}
+                                                    className={cn(
+                                                        'py-3 px-2 rounded-xl text-[10px] font-semibold uppercase tracking-wider transition-all border',
+                                                        store.selectedProvider === provider
+                                                            ? 'bg-white text-black border-white'
+                                                            : 'bg-white/[0.03] text-white/40 border-white/[0.06] hover:text-white'
+                                                    )}
+                                                >
+                                                    {provider}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* API Key */}
+                                    <AdvancedInputComponent
+                                        label={`${store.selectedProvider} API Key`}
+                                        value={store.apiKeys[store.selectedProvider]}
+                                        onChange={v => store.setApiKey(store.selectedProvider, v)}
+                                        type="password"
+                                        placeholder="Enter API key..."
+                                        icon="🔑"
+                                        required
+                                    />
+                                    
+                                    {/* Model Selection */}
+                                    {store.selectedProvider === 'google' && (
+                                        <div>
+                                            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-2 block">
+                                                Gemini Model
+                                            </label>
+                                            <select
+                                                value={store.selectedModel}
+                                                onChange={e => store.setSelectedModel(e.target.value)}
+                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none"
+                                            >
+                                                {Object.entries(VALID_GEMINI_MODELS).map(([value, label]) => (
+                                                    <option key={value} value={value}>{label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    
+                                    {store.selectedProvider === 'openrouter' && (
+                                        <OpenRouterModelSelector
+                                            value={store.apiKeys.openrouterModel}
+                                            onChange={v => store.setApiKey('openrouterModel', v)}
+                                        />
+                                    )}
+                                    
+                                    {store.selectedProvider === 'groq' && (
+                                        <GroqModelSelector
+                                            value={store.apiKeys.groqModel}
+                                            onChange={v => store.setApiKey('groqModel', v)}
+                                        />
+                                    )}
+                                    
+                                    {/* Serper Key */}
+                                    <AdvancedInputComponent
+                                        label="Serper API Key (Optional)"
+                                        value={store.apiKeys.serper}
+                                        onChange={v => store.setApiKey('serper', v)}
+                                        type="password"
+                                        placeholder="For SERP analysis..."
+                                        icon="🔍"
+                                        helpText="Enables entity gap analysis & references"
+                                    />
+                                </div>
+                            </CardComponent>
                         </div>
                         
-                        {/* Site Context */}
-                        <Card padding="lg">
-                            <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
-                                <span className="text-2xl">🏢</span>
-                                Site Context
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <AdvancedInput
-                                    label="Organization Name"
-                                    value={store.wpConfig.orgName}
-                                    onChange={v => store.setWpConfig({ orgName: v })}
-                                    placeholder="Your Brand Name"
-                                    icon="🏢"
-                                />
-                                <AdvancedInput
-                                    label="Author Name"
-                                    value={store.wpConfig.authorName}
-                                    onChange={v => store.setWpConfig({ authorName: v })}
-                                    placeholder="Editorial Team"
-                                    icon="✍️"
-                                />
-                                <AdvancedInput
-                                    label="Industry"
-                                    value={store.wpConfig.industry || ''}
-                                    onChange={v => store.setWpConfig({ industry: v })}
-                                    placeholder="e.g., Technology, Health"
-                                    icon="🏭"
-                                />
-                                <AdvancedInput
-                                    label="Target Audience"
-                                    value={store.wpConfig.targetAudience || ''}
-                                    onChange={v => store.setWpConfig({ targetAudience: v })}
-                                    placeholder="e.g., Small business owners"
-                                    icon="👥"
-                                />
-                            </div>
-                        </Card>
-                        
                         {/* Optimization Mode */}
-                        <Card padding="lg">
+                        <CardComponent padding="lg">
                             <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
                                 <span className="text-2xl">🎯</span>
                                 Optimization Mode
@@ -2825,7 +1600,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         <h4 className="text-lg font-bold">Surgical Mode</h4>
                                     </div>
                                     <p className="text-[13px] text-white/50">
-                                        Improves existing content while preserving what works. Best for established pages.
+                                        Improves existing content while preserving what works.
                                     </p>
                                 </button>
                                 
@@ -2843,51 +1618,26 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         <h4 className="text-lg font-bold">Full Rewrite</h4>
                                     </div>
                                     <p className="text-[13px] text-white/50">
-                                        Complete content regeneration. Best for low-quality or outdated pages.
+                                        Complete content regeneration for outdated pages.
                                     </p>
                                 </button>
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                <Toggle
-                                    label="Preserve Images"
-                                    checked={preserveImages}
-                                    onChange={setPreserveImages}
-                                    icon="🖼️"
-                                />
-                                <Toggle
-                                    label="Optimize Alt Text"
-                                    checked={optimizeAltText}
-                                    onChange={setOptimizeAltText}
-                                    icon="📝"
-                                />
-                                <Toggle
-                                    label="Keep Featured Image"
-                                    checked={preserveFeaturedImage}
-                                    onChange={setPreserveFeaturedImage}
-                                    icon="🎨"
-                                />
-                                <Toggle
-                                    label="Keep Categories"
-                                    checked={preserveCategories}
-                                    onChange={setPreserveCategories}
-                                    icon="📁"
-                                />
-                                <Toggle
-                                    label="Keep Tags"
-                                    checked={preserveTags}
-                                    onChange={setPreserveTags}
-                                    icon="🏷️"
-                                />
+                                <ToggleComponent label="Preserve Images" checked={preserveImages} onChange={setPreserveImages} icon="🖼️" />
+                                <ToggleComponent label="Optimize Alt Text" checked={optimizeAltText} onChange={setOptimizeAltText} icon="📝" />
+                                <ToggleComponent label="Keep Featured" checked={preserveFeaturedImage} onChange={setPreserveFeaturedImage} icon="🎨" />
+                                <ToggleComponent label="Keep Categories" checked={preserveCategories} onChange={setPreserveCategories} icon="📁" />
+                                <ToggleComponent label="Keep Tags" checked={preserveTags} onChange={setPreserveTags} icon="🏷️" />
                             </div>
-                        </Card>
+                        </CardComponent>
                     </div>
                 )}
                 
                 {/* Strategy View */}
                 {store.activeView === 'strategy' && (
                     <div className="space-y-8">
-                        <SectionHeader 
+                        <SectionHeaderComponent 
                             title="Content Strategy" 
                             icon="🚀" 
                             color="#30d158"
@@ -2897,16 +1647,15 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         <StatsDashboard />
                         
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            {/* Left Column */}
                             <div className="lg:col-span-1 space-y-6">
                                 {/* Sitemap Crawler */}
-                                <Card padding="lg">
+                                <CardComponent padding="lg">
                                     <h3 className="text-lg font-bold mb-4 flex items-center gap-3">
                                         <span className="text-2xl">🕷️</span>
                                         Sitemap Crawler
                                     </h3>
                                     <div className="space-y-4">
-                                        <AdvancedInput
+                                        <AdvancedInputComponent
                                             label="Sitemap URL"
                                             value={sitemapUrl}
                                             onChange={setSitemapUrl}
@@ -2920,38 +1669,24 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         >
                                             {store.isProcessing ? '🔄 Crawling...' : '🕷️ Crawl Sitemap'}
                                         </button>
-                                        
-                                        {crawlProgress && (
-                                            <div className="space-y-2">
-                                                <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                                                    <div 
-                                                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
-                                                        style={{ width: `${(crawlProgress.current / crawlProgress.total) * 100}%` }}
-                                                    />
-                                                </div>
-                                                <p className="text-[11px] text-white/40 text-center">
-                                                    {crawlProgress.current} / {crawlProgress.total} sitemaps
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
-                                </Card>
+                                </CardComponent>
                                 
-                                {/* Manual URL */}
-                                <Card padding="lg">
+                                {/* Quick Optimize */}
+                                <CardComponent padding="lg">
                                     <h3 className="text-lg font-bold mb-4 flex items-center gap-3">
                                         <span className="text-2xl">⚡</span>
                                         Quick Optimize
                                     </h3>
                                     <div className="space-y-4">
-                                        <AdvancedInput
+                                        <AdvancedInputComponent
                                             label="Page URL"
                                             value={manualUrl}
                                             onChange={setManualUrl}
                                             placeholder="https://yoursite.com/your-page"
                                             icon="🔗"
                                         />
-                                        <AdvancedInput
+                                        <AdvancedInputComponent
                                             label="Target Keyword (Optional)"
                                             value={targetKeywordOverride}
                                             onChange={setTargetKeywordOverride}
@@ -2969,7 +1704,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                         : 'bg-white/[0.03] border-white/[0.06] text-white/40'
                                                 )}
                                             >
-                                                📝 Save as Draft
+                                                📝 Draft
                                             </button>
                                             <button
                                                 onClick={() => store.setPublishMode('autopublish')}
@@ -2980,7 +1715,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                         : 'bg-white/[0.03] border-white/[0.06] text-white/40'
                                                 )}
                                             >
-                                                🚀 Auto Publish
+                                                🚀 Publish
                                             </button>
                                         </div>
                                         
@@ -2992,21 +1727,21 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                             {store.isProcessing ? '🔄 Optimizing...' : '⚡ Optimize Now'}
                                         </button>
                                     </div>
-                                </Card>
+                                </CardComponent>
                                 
                                 {/* Bulk Mode Toggle */}
-                                <Card padding="md">
-                                    <Toggle
+                                <CardComponent padding="md">
+                                    <ToggleComponent
                                         label="Bulk Optimization Mode"
                                         checked={showBulkMode}
                                         onChange={setShowBulkMode}
                                         description="Optimize multiple URLs at once"
                                         icon="📦"
                                     />
-                                </Card>
+                                </CardComponent>
                                 
                                 {showBulkMode && (
-                                    <Card padding="lg">
+                                    <CardComponent padding="lg">
                                         <h3 className="text-lg font-bold mb-4 flex items-center gap-3">
                                             <span className="text-2xl">📦</span>
                                             Bulk Optimization
@@ -3019,15 +1754,13 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                 <textarea
                                                     value={bulkUrls}
                                                     onChange={e => setBulkUrls(e.target.value)}
-                                                    placeholder="https://yoursite.com/page-1&#10;https://yoursite.com/page-2&#10;https://yoursite.com/page-3"
+                                                    placeholder="https://yoursite.com/page-1&#10;https://yoursite.com/page-2"
                                                     className="w-full h-32 bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[13px] font-mono resize-none focus:border-blue-500 outline-none"
                                                 />
                                             </div>
                                             
                                             <div className="flex items-center gap-4">
-                                                <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
-                                                    Concurrency:
-                                                </label>
+                                                <label className="text-[11px] font-semibold text-white/50 uppercase">Concurrency:</label>
                                                 <div className="flex gap-2">
                                                     {[1, 2, 3, 5].map(n => (
                                                         <button
@@ -3059,15 +1792,15 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                     disabled={!parseBulkUrls(bulkUrls).length}
                                                     className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-[14px] transition-all disabled:opacity-50"
                                                 >
-                                                    🚀 Start Bulk Optimization ({parseBulkUrls(bulkUrls).length} URLs)
+                                                    🚀 Start Bulk ({parseBulkUrls(bulkUrls).length} URLs)
                                                 </button>
                                             )}
                                             
                                             {bulkState.isRunning && (
                                                 <div className="space-y-3">
                                                     <div className="flex justify-between text-[12px]">
-                                                        <span className="text-green-400">✅ {bulkState.completed} completed</span>
-                                                        <span className="text-red-400">❌ {bulkState.failed} failed</span>
+                                                        <span className="text-green-400">✅ {bulkState.completed}</span>
+                                                        <span className="text-red-400">❌ {bulkState.failed}</span>
                                                         <span className="text-white/40">{bulkState.jobs.length} total</span>
                                                     </div>
                                                     <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
@@ -3077,29 +1810,26 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                         />
                                                     </div>
                                                 </div>
-                                                                                        )}
+                                            )}
                                         </div>
-                                    </Card>
+                                    </CardComponent>
                                 )}
                             </div>
                             
-                            {/* Middle & Right Columns */}
                             <div className="lg:col-span-2 space-y-6">
-                                {/* Page Queue */}
-                                <Card padding="lg">
+                                <CardComponent padding="lg">
                                     <h3 className="text-lg font-bold mb-4 flex items-center gap-3">
                                         <span className="text-2xl">📋</span>
                                         Page Queue
-                                        <Badge variant="default">{store.pages.length}</Badge>
+                                        <BadgeComponent variant="default">{store.pages.length}</BadgeComponent>
                                     </h3>
                                     <PageQueueList 
                                         onSelect={setActivePageId}
                                         limit={100}
                                         showFilters={true}
                                     />
-                                </Card>
+                                </CardComponent>
                                 
-                                {/* Activity Log */}
                                 <NeuralLog maxHeight="350px" showControls={true} />
                             </div>
                         </div>
@@ -3109,7 +1839,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 {/* Review View */}
                 {store.activeView === 'review' && (
                     <div className="space-y-8">
-                        <SectionHeader 
+                        <SectionHeaderComponent 
                             title="Content Review" 
                             icon="📊" 
                             color="#bf5af2"
@@ -3118,10 +1848,8 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         
                         {activePage ? (
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                {/* Left Column — Metrics */}
                                 <div className="space-y-6">
-                                    {/* Health Score */}
-                                    <Card padding="lg">
+                                    <CardComponent padding="lg">
                                         <div className="flex justify-center">
                                             <TitanHealthRing 
                                                 score={activePage.healthScore || 0} 
@@ -3137,33 +1865,12 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                 {activePage.slug}
                                             </p>
                                         </div>
-                                    </Card>
+                                    </CardComponent>
                                     
-                                    {/* SEO Metrics */}
                                     <DeepMetricsPanel page={activePage} />
-                                    
-                                    {/* Quick Stats */}
-                                    <Card padding="md">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="text-center p-4 bg-white/[0.02] rounded-xl">
-                                                <div className="text-2xl font-bold text-white">
-                                                    {activePage.wordCount?.toLocaleString() || '—'}
-                                                </div>
-                                                <div className="text-[10px] text-white/40 uppercase mt-1">Words</div>
-                                            </div>
-                                            <div className="text-center p-4 bg-white/[0.02] rounded-xl">
-                                                <div className="text-2xl font-bold text-white">
-                                                    {activePage.jobState?.attempts || 0}
-                                                </div>
-                                                <div className="text-[10px] text-white/40 uppercase mt-1">Attempts</div>
-                                            </div>
-                                        </div>
-                                    </Card>
                                 </div>
                                 
-                                {/* Middle & Right — Content & Validation */}
                                 <div className="lg:col-span-2 space-y-6">
-                                    {/* Tabs */}
                                     <div className="flex bg-white/[0.03] p-1 rounded-xl border border-white/[0.06]">
                                         {(['content', 'qa', 'entity'] as const).map(tab => (
                                             <button
@@ -3183,30 +1890,24 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         ))}
                                     </div>
                                     
-                                    {/* Tab Content */}
                                     {reviewTab === 'content' && (
-    <ContentPreview 
-        html={activePage.jobState?.contract?.htmlContent || ''}
-        maxHeight="600px"
-    />
-)}
-
-                                    
-                                    {reviewTab === 'qa' && (
-                                        <QASwarmPanel 
-                                            results={activePage.jobState?.qaResults || []}
+                                        <ContentPreview 
+                                            html={activePage.jobState?.contract?.htmlContent || ''}
+                                            maxHeight="600px"
                                         />
                                     )}
                                     
+                                    {reviewTab === 'qa' && (
+                                        <QASwarmPanel results={activePage.jobState?.qaResults || []} />
+                                    )}
+                                    
                                     {reviewTab === 'entity' && (
-                                        <EntityGapPanel 
-                                            entityData={activePage.jobState?.entityGapData}
-                                        />
+                                        <EntityGapPanel entityData={activePage.jobState?.entityGapData} />
                                     )}
                                 </div>
                             </div>
                         ) : (
-                            <EmptyState
+                            <EmptyStateComponent
                                 icon="📊"
                                 title="Select a Page"
                                 description="Choose a page from the Strategy tab to review its optimization results"
@@ -3218,7 +1919,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                 {/* Analytics View */}
                 {store.activeView === 'analytics' && (
                     <div className="space-y-8">
-                        <SectionHeader 
+                        <SectionHeaderComponent 
                             title="Analytics" 
                             icon="📈" 
                             color="#ffd60a"
@@ -3228,8 +1929,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                         <StatsDashboard />
                         
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Global Statistics */}
-                            <Card padding="lg">
+                            <CardComponent padding="lg">
                                 <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
                                     <span className="text-2xl">📊</span>
                                     Session Statistics
@@ -3260,10 +1960,9 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         <div className="text-[11px] text-white/40 uppercase mt-2">Success Rate</div>
                                     </div>
                                 </div>
-                            </Card>
+                            </CardComponent>
                             
-                            {/* Recent Jobs */}
-                            <Card padding="lg">
+                            <CardComponent padding="lg">
                                 <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
                                     <span className="text-2xl">🕐</span>
                                     Recent Jobs
@@ -3301,9 +2000,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                                     </div>
                                                     <div className={cn(
                                                         'text-xl font-bold',
-                                                        page.jobState?.status === 'completed'
-                                                            ? 'text-green-400'
-                                                            : 'text-red-400'
+                                                        page.jobState?.status === 'completed' ? 'text-green-400' : 'text-red-400'
                                                     )}>
                                                         {page.jobState?.status === 'completed' ? '✅' : '❌'}
                                                     </div>
@@ -3321,24 +2018,8 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                                         </div>
                                     )}
                                 </div>
-                            </Card>
+                            </CardComponent>
                         </div>
-                        
-                        {/* NLP Coverage (if enabled) */}
-                        {store.neuronEnabled && store.neuronTerms.length > 0 && (
-                            <Card padding="lg">
-                                <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
-                                    <span className="text-2xl">🧬</span>
-                                    NeuronWriter NLP Terms
-                                    <Badge variant="info">{store.neuronTerms.length} terms</Badge>
-                                </h3>
-                                <NeuronNLPPanel 
-                                    content={activePage?.jobState?.contract?.htmlContent || ''}
-                                    title={activePage?.title}
-                                    showTitle={false}
-                                />
-                            </Card>
-                        )}
                     </div>
                 )}
             </main>
@@ -3354,8 +2035,6 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
                             <span>Enterprise Edition</span>
                         </div>
                         <div className="flex items-center gap-4">
-                            <span>🚀 SOTA SEO/AEO/GEO Optimization</span>
-                            <span className="text-white/10">|</span>
                             <span>Provider: {store.selectedProvider.toUpperCase()}</span>
                             <span className="text-white/10">|</span>
                             <span>Model: {getActualModel()}</span>
@@ -3368,334 +2047,7 @@ const log = (msg: string, _progressOrForce?: number | boolean) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔥🔥🔥 CUSTOM MODEL INPUT COMPONENT — FOR OPENROUTER & GROQ
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface ModelSelectorWithCustomInputProps {
-    provider: 'openrouter' | 'groq';
-    value: string;
-    onChange: (value: string) => void;
-    presetModels: string[];
-    label?: string;
-}
-
-const ModelSelectorWithCustomInput: React.FC<ModelSelectorWithCustomInputProps> = ({
-    provider,
-    value,
-    onChange,
-    presetModels,
-    label
-}) => {
-    const [isCustom, setIsCustom] = useState(false);
-    const [customModel, setCustomModel] = useState('');
-    
-    // Check if current value is a custom model (not in presets)
-    useEffect(() => {
-        if (value && !presetModels.includes(value)) {
-            setIsCustom(true);
-            setCustomModel(value);
-        }
-    }, [value, presetModels]);
-    
-    const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selected = e.target.value;
-        if (selected === '__custom__') {
-            setIsCustom(true);
-            // Keep the custom model if already set
-            if (customModel) {
-                onChange(customModel);
-            }
-        } else {
-            setIsCustom(false);
-            setCustomModel('');
-            onChange(selected);
-        }
-    };
-    
-    const handleCustomModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setCustomModel(val);
-        onChange(val);
-    };
-    
-    const providerInfo = provider === 'openrouter' 
-        ? { 
-            placeholder: 'e.g., anthropic/claude-sonnet-4 or google/gemini-2.5-flash-preview',
-            helpText: 'Enter any model from OpenRouter. Format: provider/model-name',
-            docsUrl: 'https://openrouter.ai/models'
-          }
-        : {
-            placeholder: 'e.g., llama-3.3-70b-versatile or mixtral-8x7b-32768',
-            helpText: 'Enter any Groq-supported model name',
-            docsUrl: 'https://console.groq.com/docs/models'
-          };
-    
-    return (
-        <div className="space-y-3">
-            <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider block">
-                {label || `${provider.charAt(0).toUpperCase() + provider.slice(1)} Model`}
-            </label>
-            
-            {/* Preset / Custom Toggle */}
-            <div className="flex gap-2 mb-2">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setIsCustom(false);
-                        if (presetModels.length > 0) {
-                            onChange(presetModels[0]);
-                        }
-                    }}
-                    className={cn(
-                        'flex-1 py-2 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        !isCustom
-                            ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white'
-                    )}
-                >
-                    📋 Preset Models
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setIsCustom(true)}
-                    className={cn(
-                        'flex-1 py-2 px-3 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border',
-                        isCustom
-                            ? 'bg-purple-500/20 border-purple-500/30 text-purple-400'
-                            : 'bg-white/[0.03] border-white/[0.06] text-white/40 hover:text-white'
-                    )}
-                >
-                    ✏️ Custom Model
-                </button>
-            </div>
-            
-            {!isCustom ? (
-                /* Preset Model Dropdown */
-                <select
-                    value={presetModels.includes(value) ? value : '__custom__'}
-                    onChange={handlePresetChange}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none transition-all"
-                >
-                    {presetModels.map(model => (
-                        <option key={model} value={model}>{model}</option>
-                    ))}
-                    <option value="__custom__">— Enter Custom Model —</option>
-                </select>
-            ) : (
-                /* Custom Model Input */
-                <div className="space-y-2">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={customModel}
-                            onChange={handleCustomModelChange}
-                            placeholder={providerInfo.placeholder}
-                            className="w-full bg-white/[0.03] border border-purple-500/30 rounded-xl px-4 py-3 text-[14px] focus:border-purple-500 outline-none transition-all font-mono"
-                        />
-                        {customModel && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <span className="text-green-400 text-lg">✓</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <p className="text-[11px] text-white/40">
-                            {providerInfo.helpText}
-                        </p>
-                        <a 
-                            href={providerInfo.docsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                            View all models →
-                        </a>
-                    </div>
-                </div>
-            )}
-            
-            {/* Current Model Display */}
-            {value && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] rounded-lg border border-white/[0.04]">
-                    <span className="text-[10px] text-white/40 uppercase">Active:</span>
-                    <span className="text-[12px] text-white/70 font-mono">{value}</span>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 🎨 ENHANCED AI PROVIDER CONFIG CARD — WITH CUSTOM MODEL INPUT
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface AIProviderConfigCardProps {
-    className?: string;
-}
-
-const AIProviderConfigCard: React.FC<AIProviderConfigCardProps> = ({ className }) => {
-    const store = useAppStore();
-    
-    // Preset models for each provider
-    const OPENROUTER_PRESET_MODELS = [
-        'google/gemini-2.5-flash-preview',
-        'google/gemini-2.5-pro-preview',
-        'anthropic/claude-sonnet-4',
-        'anthropic/claude-opus-4',
-        'openai/gpt-4o',
-        'openai/gpt-4o-mini',
-        'meta-llama/llama-3.3-70b-instruct',
-        'deepseek/deepseek-chat',
-        'deepseek/deepseek-r1',
-        'mistralai/mistral-large',
-        'qwen/qwen-2.5-72b-instruct',
-    ];
-    
-    const GROQ_PRESET_MODELS = [
-        'llama-3.3-70b-versatile',
-        'llama-3.1-70b-versatile',
-        'llama-3.1-8b-instant',
-        'mixtral-8x7b-32768',
-        'gemma2-9b-it',
-        'llama-guard-3-8b',
-    ];
-    
-    const GEMINI_MODELS = [
-        { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash Preview' },
-        { value: 'gemini-2.5-pro-preview-05-06', label: 'Gemini 2.5 Pro Preview' },
-        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    ];
-    
-    return (
-        <Card padding="lg" className={className}>
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-3">
-                <span className="text-2xl">🤖</span>
-                AI Provider Configuration
-            </h3>
-            
-            <div className="space-y-6">
-                {/* Provider Selection */}
-                <div>
-                    <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-3 block">
-                        Select Provider
-                    </label>
-                    <div className="grid grid-cols-5 gap-2">
-                        {(['google', 'openrouter', 'openai', 'anthropic', 'groq'] as const).map(provider => (
-                            <button
-                                key={provider}
-                                onClick={() => store.setSelectedProvider(provider)}
-                                className={cn(
-                                    'py-3 px-2 rounded-xl text-[10px] font-semibold uppercase tracking-wider transition-all border',
-                                    store.selectedProvider === provider
-                                        ? 'bg-white text-black border-white'
-                                        : 'bg-white/[0.03] text-white/40 border-white/[0.06] hover:text-white hover:border-white/[0.12]'
-                                )}
-                            >
-                                {provider === 'google' && '🔷 '}
-                                {provider === 'openrouter' && '🌐 '}
-                                {provider === 'openai' && '🟢 '}
-                                {provider === 'anthropic' && '🟠 '}
-                                {provider === 'groq' && '⚡ '}
-                                {provider}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                
-                {/* API Key Input */}
-                <AdvancedInput
-                    label={`${store.selectedProvider.charAt(0).toUpperCase() + store.selectedProvider.slice(1)} API Key`}
-                    value={store.apiKeys[store.selectedProvider]}
-                    onChange={v => store.setApiKey(store.selectedProvider, v)}
-                    type="password"
-                    placeholder="Enter API key..."
-                    icon="🔑"
-                    required
-                />
-                
-                {/* Model Selection — Provider Specific */}
-                {store.selectedProvider === 'google' && (
-                    <div>
-                        <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-2 block">
-                            Gemini Model
-                        </label>
-                        <select
-                            value={store.selectedModel}
-                            onChange={e => store.setSelectedModel(e.target.value)}
-                            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] focus:border-blue-500 outline-none"
-                        >
-                            {GEMINI_MODELS.map(model => (
-                                <option key={model.value} value={model.value}>{model.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                
-                {/* 🔥 OpenRouter — With Custom Model Input */}
-                {store.selectedProvider === 'openrouter' && (
-                    <ModelSelectorWithCustomInput
-                        provider="openrouter"
-                        value={store.apiKeys.openrouterModel}
-                        onChange={v => store.setApiKey('openrouterModel', v)}
-                        presetModels={OPENROUTER_PRESET_MODELS}
-                        label="OpenRouter Model"
-                    />
-                )}
-                
-                {/* 🔥 Groq — With Custom Model Input */}
-                {store.selectedProvider === 'groq' && (
-                    <ModelSelectorWithCustomInput
-                        provider="groq"
-                        value={store.apiKeys.groqModel}
-                        onChange={v => store.setApiKey('groqModel', v)}
-                        presetModels={GROQ_PRESET_MODELS}
-                        label="Groq Model"
-                    />
-                )}
-                
-                {/* OpenAI / Anthropic — Fixed Models */}
-                {store.selectedProvider === 'openai' && (
-                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">🟢</span>
-                            <div>
-                                <div className="text-[14px] font-semibold text-white">GPT-4o</div>
-                                <div className="text-[11px] text-white/40">OpenAI's most capable model</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                {store.selectedProvider === 'anthropic' && (
-                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">🟠</span>
-                            <div>
-                                <div className="text-[14px] font-semibold text-white">Claude Sonnet 4</div>
-                                <div className="text-[11px] text-white/40">Anthropic's latest model</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                {/* Serper API Key (Optional - for all providers) */}
-                <AdvancedInput
-                    label="Serper API Key (Optional)"
-                    value={store.apiKeys.serper}
-                    onChange={v => store.setApiKey('serper', v)}
-                    type="password"
-                    placeholder="For SERP analysis..."
-                    icon="🔍"
-                    helpText="Enables entity gap analysis & reference discovery"
-                />
-            </div>
-        </Card>
-    );
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 📦 ADDITIONAL UI COMPONENTS
+// 📦 UI COMPONENT WRAPPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface AdvancedInputProps {
@@ -3711,15 +2063,7 @@ interface AdvancedInputProps {
 }
 
 const AdvancedInput: React.FC<AdvancedInputProps> = ({
-    label,
-    value,
-    onChange,
-    type = 'text',
-    placeholder,
-    icon,
-    helpText,
-    required,
-    disabled
+    label, value, onChange, type = 'text', placeholder, icon, helpText, required, disabled
 }) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputType = type === 'password' && showPassword ? 'text' : type;
@@ -3731,24 +2075,20 @@ const AdvancedInput: React.FC<AdvancedInputProps> = ({
                 {required && <span className="text-red-400">*</span>}
             </label>
             <div className="relative">
-                {icon && (
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
-                        {icon}
-                    </span>
-                )}
+                {icon && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">{icon}</span>}
                 <input
                     type={inputType}
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
                     disabled={disabled}
-                    className={cn(
-                        'w-full bg-white/[0.03] border border-white/[0.08] rounded-xl py-3 text-[14px]',
-                        'focus:border-blue-500 outline-none transition-all',
-                        'placeholder:text-white/20',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        className={cn(
+                        'w-full bg-white/[0.03] border rounded-xl py-3 text-[14px]',
+                        'focus:outline-none focus:ring-2 transition-all duration-200',
+                        'placeholder:text-white/20 disabled:opacity-50 disabled:cursor-not-allowed',
                         icon ? 'pl-12 pr-4' : 'px-4',
-                        type === 'password' && 'pr-12'
+                        type === 'password' && 'pr-12',
+                        'border-white/[0.08] hover:border-white/[0.12] focus:border-blue-500 focus:ring-blue-500/20'
                     )}
                 />
                 {type === 'password' && (
@@ -3762,11 +2102,15 @@ const AdvancedInput: React.FC<AdvancedInputProps> = ({
                 )}
             </div>
             {helpText && (
-                <p className="text-[11px] text-white/30">{helpText}</p>
+                <p className="text-[11px] text-white/30 pl-1">{helpText}</p>
             )}
         </div>
     );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔘 TOGGLE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface ToggleProps {
     label: string;
@@ -3783,15 +2127,18 @@ const Toggle: React.FC<ToggleProps> = ({
     onChange,
     description,
     icon,
-    disabled
+    disabled = false
 }) => {
     return (
-        <label className={cn(
-            'flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer',
-            'hover:bg-white/[0.02]',
-            checked ? 'border-blue-500/30 bg-blue-500/5' : 'border-white/[0.06]',
-            disabled && 'opacity-50 cursor-not-allowed'
-        )}>
+        <div 
+            className={cn(
+                'flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer',
+                'hover:bg-white/[0.02]',
+                checked ? 'border-blue-500/30 bg-blue-500/5' : 'border-white/[0.06]',
+                disabled && 'opacity-50 cursor-not-allowed'
+            )}
+            onClick={() => !disabled && onChange(!checked)}
+        >
             <div className="flex items-center gap-3">
                 {icon && <span className="text-lg">{icon}</span>}
                 <div>
@@ -3803,21 +2150,24 @@ const Toggle: React.FC<ToggleProps> = ({
             </div>
             <div 
                 className={cn(
-                    'w-12 h-7 rounded-full transition-all relative',
+                    'w-12 h-7 rounded-full transition-all relative flex-shrink-0',
                     checked ? 'bg-blue-500' : 'bg-white/10'
                 )}
-                onClick={() => !disabled && onChange(!checked)}
             >
                 <div 
                     className={cn(
-                        'absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all',
-                        checked ? 'left-6' : 'left-1'
+                        'absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-transform',
+                        checked ? 'translate-x-6' : 'translate-x-1'
                     )}
                 />
             </div>
-        </label>
+        </div>
     );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📦 CARD COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface CardProps {
     children: React.ReactNode;
@@ -3843,6 +2193,10 @@ const Card: React.FC<CardProps> = ({ children, padding = 'md', className }) => {
     );
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🏷️ BADGE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
 interface BadgeProps {
     children: React.ReactNode;
     variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
@@ -3859,13 +2213,17 @@ const Badge: React.FC<BadgeProps> = ({ children, variant = 'default' }) => {
     
     return (
         <span className={cn(
-            'px-2 py-0.5 rounded-full text-[10px] font-semibold',
+            'px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider',
             variantClasses[variant]
         )}>
             {children}
         </span>
     );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📭 EMPTY STATE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface EmptyStateProps {
     icon: string;
@@ -3874,12 +2232,16 @@ interface EmptyStateProps {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description }) => (
-    <div className="text-center py-16">
-        <div className="text-6xl mb-4 opacity-30">{icon}</div>
-        <div className="text-[16px] font-semibold text-white/60">{title}</div>
-        <div className="text-[13px] text-white/30 mt-2">{description}</div>
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="text-6xl mb-4 opacity-20">{icon}</div>
+        <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+        <p className="text-[13px] text-white/50 max-w-sm">{description}</p>
     </div>
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📋 SECTION HEADER COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface SectionHeaderProps {
     title: string;
@@ -3889,7 +2251,7 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon, color, subtitle }) => (
-    <div className="flex items-center gap-4 mb-6">
+    <div className="flex items-center gap-4 mb-8">
         <div 
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
             style={{ 
@@ -3909,10 +2271,14 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon, color, subti
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📤 EXPORTS
+// 📤 DEFAULT EXPORT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default App;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📦 NAMED EXPORTS FOR EXTERNAL USE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export {
     AdvancedInput,
@@ -3921,6 +2287,13 @@ export {
     Badge,
     EmptyState,
     SectionHeader,
-    ModelSelectorWithCustomInput,
-    AIProviderConfigCard
+    OpenRouterModelSelector,
+    GroqModelSelector,
+    deepClone,
+    removeDuplicateFAQSections,
+    removeH1TagsFromContent,
+    validateContentNoH1,
+    hasPremiumFAQStyling,
+    countWords
 };
+
