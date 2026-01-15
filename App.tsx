@@ -1058,7 +1058,7 @@ const App: React.FC = () => {
 // 🎬 PHASE 5.5: YOUTUBE VIDEO INTEGRATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if (store.apiKeys.serper && finalContract && finalContract.htmlContent) {
+if (store.apiKeys.serper && bestContract && bestContract.htmlContent) {
     store.updateJobState(targetId, { phase: 'youtube_integration' as GodModePhase });
     log(`🎬 PHASE 5.5: YouTube Video Integration...`, true);
     
@@ -1090,11 +1090,11 @@ if (store.apiKeys.serper && finalContract && finalContract.htmlContent) {
             let insertMethod = '';
             
             // Option 1: After Quick Answer box
-            const quickAnswerEnd = finalContract.htmlContent.toLowerCase().indexOf('quick answer');
+            const quickAnswerEnd = bestContract.htmlContent.toLowerCase().indexOf('quick answer');
             if (quickAnswerEnd > 0 && quickAnswerEnd < 1500) {
                 // Find the closing div after Quick Answer
                 const searchStart = quickAnswerEnd;
-                const searchArea = finalContract.htmlContent.substring(searchStart, searchStart + 500);
+                const searchArea = bestContract.htmlContent.substring(searchStart, searchStart + 500);
                 const closingDivs = searchArea.match(/<\/div>/gi) || [];
                 
                 if (closingDivs.length >= 2) {
