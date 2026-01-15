@@ -91,7 +91,11 @@ import {
 import { 
     orchestrator, 
     VALID_GEMINI_MODELS, 
-    OPENROUTER_MODELS
+    OPENROUTER_MODELS,
+    searchYouTubeVideo,        	// ADD THIS
+    createYouTubeEmbed,			// ADD THIS
+	discoverReferences,			// ADD THIS
+    createReferencesSection		// ADD THIS (note: function name differs!)
 } from './lib/ai-orchestrator';
 import { getNeuronWriterAnalysis, listNeuronProjects } from './neuronwriter';
 
@@ -755,14 +759,27 @@ const App: React.FC = () => {
         p: store.wpConfig.password || ''
     }), [store.wpConfig.username, store.wpConfig.password]);
 
-    const hasRequiredKeys = useCallback(() => {
-        return !!(store.apiKeys.google || store.apiKeys.openrouter || 
-                  store.apiKeys.openai || store.apiKeys.anthropic || store.apiKeys.groq);
-    }, [store.apiKeys]);
+const hasRequiredKeys = useCallback(() => {
+    return !!(store.apiKeys.google || store.apiKeys.openrouter || 
+              store.apiKeys.openai || store.apiKeys.anthropic || store.apiKeys.groq);
+}, [store.apiKeys]);
 
-    const hasSerperKey = useCallback(() => {
-        return !!(store.apiKeys.serper && store.apiKeys.serper.length > 10);
-    }, [store.apiKeys.serper]);
+// 🔥 IMPROVED: Validates Serper API key format properly
+const hasSerperKey = useCallback(() => {
+    const key = store.apiKeys.serper;
+    // Serper keys are typically 40+ characters, alphanumeric
+    return !!(key && key.length >= 30 && key.match(/^[a-zA-Z0-9]+$/));
+}, [store.apiKeys.serper]);
+
+// 🔥 NEW: Explicit validation function for use in conditionals
+const hasValidSerperKey = useCallback(() => {
+    const key = store.apiKeys.serper;
+    if (!key) return false;
+    if (key.length < 30) return false;
+    if (!key.match(/^[a-zA-Z0-9]+$/)) return false;
+    return true;
+}, [store.apiKeys.serper]);
+
 
     const hasNeuronConfig = useCallback(() => {
         return !!(store.neuronEnabled && store.apiKeys.neuronwriter && store.apiKeys.neuronProject);
@@ -1179,22 +1196,41 @@ const App: React.FC = () => {
                 }
             }
 
-            // ═══════════════════════════════════════════════════════════════
-            // PHASE 4: INTERNAL LINKS
-            // ═══════════════════════════════════════════════════════════════
-            
-            store.updateJobState(targetId, { phase: 'internal_linking' });
-            log(`🔗 PHASE 4: Building internal links...`);
-			
-			            updateProgress('internal_linking');
+// ═══════════════════════════════════════════════════════════════
+// PHASE 4: INTERNAL LINKS — ALWAYS FETCH FROM WORDPRESS
+// ═══════════════════════════════════════════════════════════════
 
-            
-            const internalLinks: InternalLinkTarget[] = store.pages
-                .filter(p => p.id !== targetId && p.title && p.title.length > 5)
-                .slice(0, 50)
-                .map(p => ({ url: p.id, title: p.title, slug: p.slug }));
-            
-            log(`   → ${internalLinks.length} potential link targets`);
+store.updateJobState(targetId, { phase: 'internal_linking' });
+log(`🔗 PHASE 4: Building internal links...`);
+
+updateProgress('internal_linking');
+
+let internalLinks: InternalLinkTarget[] = [];
+
+// ALWAYS fetch from WordPress for complete link targets (not just local store)
+try {
+    const wpLinkTargets = await discoverInternalLinkTargets(
+        store.wpConfig.url,
+        auth,
+        { 
+            excludePostId: postId || undefined, 
+            excludeUrls: [targetId], 
+            maxPosts: 100 
+        },
+        log
+    );
+    internalLinks = wpLinkTargets;
+    log(`   → ${internalLinks.length} link targets fetched from WordPress`);
+} catch (e: any) {
+    log(`   ⚠️ WordPress link discovery failed: ${e.message}`);
+    // Fallback to store pages ONLY if WordPress fetch fails
+    internalLinks = store.pages
+        .filter(p => p.id !== targetId && p.title && p.title.length > 5)
+        .slice(0, 50)
+        .map(p => ({ url: p.id, title: p.title, slug: p.slug }));
+    log(`   → ${internalLinks.length} fallback link targets from local store`);
+}
+
 
             // ═══════════════════════════════════════════════════════════════
             // PHASE 5: CONTENT SYNTHESIS — STAGED PIPELINE
