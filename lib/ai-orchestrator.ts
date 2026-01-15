@@ -232,48 +232,51 @@ export const THEME_ADAPTIVE_CSS = `
 
 export function createQuickAnswerBox(answer: string, title: string = 'Quick Answer'): string {
     return `
-<div class="wpo-box" style="background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%); border-left: 4px solid #6366f1;">
-    <div style="display: flex; align-items: flex-start; gap: 16px;">
-        <div style="min-width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <span style="font-size: 24px;">⚡</span>
+<div class="wpo-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; padding: 32px; margin: 40px 0; color: white; box-shadow: 0 20px 40px rgba(102,126,234,0.3);">
+    <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div style="min-width: 60px; height: 60px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 28px;">⚡</span>
         </div>
         <div style="flex: 1;">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6366f1; margin-bottom: 8px;">${escapeHtml(title)}</div>
-            <p style="font-size: 17px; line-height: 1.7; margin: 0; font-weight: 500;">${answer}</p>
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; margin-bottom: 10px;">${escapeHtml(title)}</div>
+            <p style="font-size: 18px; line-height: 1.7; margin: 0; font-weight: 500;">${answer}</p>
         </div>
     </div>
 </div>`;
 }
+
 
 export function createProTipBox(tip: string, title: string = 'Pro Tip'): string {
     return `
-<div class="wpo-box" style="background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(34,197,94,0.04) 100%); border-left: 4px solid #10b981;">
-    <div style="display: flex; align-items: flex-start; gap: 14px;">
-        <div style="min-width: 44px; height: 44px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <span style="font-size: 20px;">💡</span>
+<div class="wpo-box" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 20px; padding: 28px; margin: 36px 0; color: white; box-shadow: 0 16px 32px rgba(17,153,142,0.25);">
+    <div style="display: flex; align-items: flex-start; gap: 18px;">
+        <div style="min-width: 52px; height: 52px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 24px;">💡</span>
         </div>
         <div style="flex: 1;">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #10b981; margin-bottom: 8px;">${escapeHtml(title)}</div>
-            <p style="font-size: 15px; line-height: 1.7; margin: 0;">${tip}</p>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; margin-bottom: 8px;">${escapeHtml(title)}</div>
+            <p style="font-size: 16px; line-height: 1.7; margin: 0;">${tip}</p>
         </div>
     </div>
 </div>`;
 }
 
+
 export function createWarningBox(warning: string, title: string = 'Important'): string {
     return `
-<div class="wpo-box" style="background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(234,179,8,0.04) 100%); border-left: 4px solid #f59e0b;">
-    <div style="display: flex; align-items: flex-start; gap: 14px;">
-        <div style="min-width: 44px; height: 44px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <span style="font-size: 20px;">⚠️</span>
+<div class="wpo-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 20px; padding: 28px; margin: 36px 0; color: white; box-shadow: 0 16px 32px rgba(245,87,108,0.25);">
+    <div style="display: flex; align-items: flex-start; gap: 18px;">
+        <div style="min-width: 52px; height: 52px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 24px;">⚠️</span>
         </div>
         <div style="flex: 1;">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #d97706; margin-bottom: 8px;">${escapeHtml(title)}</div>
-            <p style="font-size: 15px; line-height: 1.7; margin: 0;">${warning}</p>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; margin-bottom: 8px;">${escapeHtml(title)}</div>
+            <p style="font-size: 16px; line-height: 1.7; margin: 0;">${warning}</p>
         </div>
     </div>
 </div>`;
 }
+
 
 export function createExpertQuoteBox(quote: string, author: string, title?: string): string {
     return `
@@ -294,23 +297,27 @@ export function createKeyTakeaways(takeaways: string[]): string {
     if (!takeaways || takeaways.length === 0) return '';
     
     const items = takeaways.map((t, i) => `
-        <li style="display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; ${i < takeaways.length - 1 ? 'border-bottom: 1px solid rgba(128,128,128,0.08);' : ''}">
-            <span style="min-width: 28px; height: 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 800; flex-shrink: 0;">${i + 1}</span>
-            <span style="font-size: 15px; line-height: 1.6; padding-top: 3px;">${escapeHtml(t)}</span>
+        <li style="display: flex; align-items: flex-start; gap: 16px; padding: 18px 0; ${i < takeaways.length - 1 ? 'border-bottom: 1px solid rgba(99,102,241,0.1);' : ''}">
+            <span style="min-width: 36px; height: 36px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(102,126,234,0.3);">${i + 1}</span>
+            <span style="font-size: 16px; line-height: 1.6; padding-top: 6px; color: #374151;">${escapeHtml(t)}</span>
         </li>
     `).join('');
 
     return `
-<div class="wpo-box" style="background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.03) 100%); border-radius: 20px; padding: 28px;">
-    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(99,102,241,0.15);">
-        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 14px; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 22px;">🎯</span>
+<div class="wpo-box" style="background: linear-gradient(135deg, rgba(102,126,234,0.08) 0%, rgba(118,75,162,0.04) 100%); border: 2px solid rgba(99,102,241,0.15); border-radius: 24px; padding: 36px; margin: 48px 0;">
+    <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 2px solid rgba(99,102,241,0.1);">
+        <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 24px rgba(102,126,234,0.3);">
+            <span style="font-size: 28px;">🎯</span>
         </div>
-        <h3 style="font-size: 20px; font-weight: 800; margin: 0;">Key Takeaways</h3>
+        <div>
+            <h3 style="font-size: 22px; font-weight: 800; margin: 0; color: #111827;">Key Takeaways</h3>
+            <p style="font-size: 14px; color: #6b7280; margin: 4px 0 0 0;">Remember these crucial points</p>
+        </div>
     </div>
     <ul style="list-style: none; padding: 0; margin: 0;">${items}</ul>
 </div>`;
 }
+
 
 export function createFAQAccordion(faqs: Array<{ question: string; answer: string }>): string {
     if (!faqs || faqs.length === 0) return '';
@@ -318,41 +325,38 @@ export function createFAQAccordion(faqs: Array<{ question: string; answer: strin
     const sectionId = generateUniqueId();
     
     const faqItems = faqs.map((faq, index) => {
-        const itemId = `${sectionId}-${index}`;
         return `
-        <div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question" style="border-bottom: 1px solid rgba(128,128,128,0.1);">
-            <input type="checkbox" id="${itemId}" style="position: absolute; opacity: 0; pointer-events: none;" />
-            <label for="${itemId}" style="display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; cursor: pointer; font-size: 15px; font-weight: 600; gap: 12px;">
-                <span itemprop="name" style="flex: 1;">${escapeHtml(faq.question)}</span>
-                <span style="font-size: 12px; color: #6366f1; transition: transform 0.3s;" class="${sectionId}-arrow">▼</span>
-            </label>
-            <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;" class="${sectionId}-content">
-                <div itemprop="text" style="padding: 0 20px 20px 20px; font-size: 15px; line-height: 1.8; opacity: 0.85;">${faq.answer}</div>
+        <div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question" class="wpo-faq-item" style="border: 1px solid rgba(128,128,128,0.12); border-radius: 12px; margin-bottom: 12px; overflow: hidden; background: white;">
+            <button 
+                onclick="this.parentElement.classList.toggle('wpo-faq-open'); this.querySelector('.wpo-faq-arrow').style.transform = this.parentElement.classList.contains('wpo-faq-open') ? 'rotate(180deg)' : 'rotate(0deg)'; this.nextElementSibling.style.maxHeight = this.parentElement.classList.contains('wpo-faq-open') ? this.nextElementSibling.scrollHeight + 'px' : '0px';"
+                style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; cursor: pointer; font-size: 16px; font-weight: 600; gap: 16px; background: none; border: none; text-align: left; font-family: inherit; color: inherit;"
+            >
+                <span itemprop="name" style="flex: 1; line-height: 1.4;">${escapeHtml(faq.question)}</span>
+                <span class="wpo-faq-arrow" style="font-size: 14px; color: #6366f1; transition: transform 0.3s ease; flex-shrink: 0;">▼</span>
+            </button>
+            <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: rgba(99,102,241,0.03);">
+                <div itemprop="text" style="padding: 20px 24px; font-size: 15px; line-height: 1.8; color: #374151;">${faq.answer}</div>
             </div>
         </div>`;
     }).join('');
 
     return `
-<style>
-#${sectionId} input:checked + label + div { max-height: 1000px !important; }
-#${sectionId} input:checked + label .${sectionId}-arrow { transform: rotate(180deg); }
-#${sectionId} label:hover { background: rgba(128,128,128,0.04); }
-</style>
-<section id="${sectionId}" itemscope itemtype="https://schema.org/FAQPage" style="border: 1px solid rgba(128,128,128,0.15); border-radius: 20px; margin: 48px 0; overflow: hidden;">
-    <div style="padding: 22px 24px; background: rgba(128,128,128,0.04); border-bottom: 1px solid rgba(128,128,128,0.1);">
-        <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 14px; display: flex; align-items: center; justify-content: center;">
-                <span style="font-size: 22px;">❓</span>
-            </div>
-            <div>
-                <h2 style="font-size: 20px; font-weight: 800; margin: 0;">Frequently Asked Questions</h2>
-                <p style="font-size: 13px; opacity: 0.6; margin: 4px 0 0 0;">${faqs.length} questions answered</p>
-            </div>
+<section id="${sectionId}" itemscope itemtype="https://schema.org/FAQPage" style="margin: 56px 0;">
+    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+        <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(99,102,241,0.25);">
+            <span style="font-size: 26px;">❓</span>
+        </div>
+        <div>
+            <h2 style="font-size: 24px; font-weight: 800; margin: 0; color: #111827;">Frequently Asked Questions</h2>
+            <p style="font-size: 14px; color: #6b7280; margin: 4px 0 0 0;">${faqs.length} questions answered by experts</p>
         </div>
     </div>
-    ${faqItems}
+    <div class="wpo-faq-container">
+        ${faqItems}
+    </div>
 </section>`;
 }
+
 
 export function createReferencesSection(references: DiscoveredReference[]): string {
     if (!references || references.length === 0) return '';
@@ -1432,19 +1436,22 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
     
     async generateSingleShot(config: GenerateConfig, log: LogFunction): Promise<GenerationResult> {
         const startTime = Date.now();
-        log(`🎨 SINGLE-SHOT GENERATION (with ALL features)`);
+        log(`🎨 SINGLE-SHOT GENERATION (FULL FEATURES)`);
         
         let youtubeVideo: YouTubeVideoData | null = null;
         let references: DiscoveredReference[] = [];
         
         // ═══════════════════════════════════════════════════════════════
-        // PARALLEL: YouTube + References Discovery
+        // PARALLEL: YouTube + References Discovery (SAME AS STAGED!)
         // ═══════════════════════════════════════════════════════════════
         
         const youtubePromise = config.apiKeys?.serper ? (async () => {
             try {
                 log(`   🎬 Searching YouTube...`);
                 youtubeVideo = await searchYouTubeVideo(config.topic, config.apiKeys.serper, log);
+                if (youtubeVideo) {
+                    log(`   ✅ YouTube: "${youtubeVideo.title.substring(0, 40)}..."`);
+                }
             } catch (e: any) {
                 log(`   ⚠️ YouTube search failed: ${e.message}`);
             }
@@ -1466,6 +1473,7 @@ OUTPUT: HTML only, starting with <h2>Conclusion</h2>.`;
                     log(`   ✅ Using ${references.length} pre-validated references`);
                 } else {
                     references = await discoverReferences(config.topic, config.apiKeys.serper, { targetCount: 10, minAuthorityScore: 60 }, log);
+                    log(`   ✅ Discovered ${references.length} references`);
                 }
             } catch (e: any) {
                 log(`   ⚠️ Reference discovery failed: ${e.message}`);
@@ -1601,6 +1609,8 @@ Output ONLY valid JSON with: title, metaDescription, slug, htmlContent, excerpt,
                         );
                         assembledContent = linkResult.html;
                         log(`   ✅ ${linkResult.totalLinks} internal links added`);
+                    } else {
+                        log(`   ⚠️ No internal links provided`);
                     }
                     
                     const finalContract: ContentContract = {
