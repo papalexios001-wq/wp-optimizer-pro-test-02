@@ -14,6 +14,14 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { GoogleGenAI } from '@google/genai';
+
+// ============================================================================
+// v30.0 ENTERPRISE ENHANCEMENT MODULES
+// ============================================================================
+import EEATOptimizer from './eeat-optimizer';
+import GEOOptimizer from './geo-optimizer';
+import VisualDesignSystem from './visual-design-system';
+import SemanticContentOptimizer from './semantic-content-optimizer';
 import { 
     ContentContract,     
     GenerateConfig, 
@@ -33,7 +41,7 @@ import {
 // 📌 VERSION & CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const AI_ORCHESTRATOR_VERSION = "27.0.0";
+export const AI_ORCHESTRATOR_VERSION = "30.0.0";
 
 const TIMEOUTS = {
     OUTLINE_GENERATION: 60000,
@@ -2619,3 +2627,88 @@ export const OPENROUTER_MODELS = [
 ];
 
 export default orchestrator;
+
+// ============================================================================
+// v30.0 ENTERPRISE ENHANCEMENT EXPORTS
+// ============================================================================
+
+/**
+ * Apply all enterprise-grade enhancements to generated content
+ */
+export async function applyEnterpriseEnhancements(
+  content: string,
+  config: {
+    topic: string;
+    authorName: string;
+    authorCredentials?: string;
+    publisherName: string;
+    enableEEAT?: boolean;
+    enableGEO?: boolean;
+    enableVisualDesign?: boolean;
+    enableSemanticHTML?: boolean;
+  }
+): Promise<{ html: string; metadata: any; scores: any }> {
+  let enhancedContent = content;
+  const scores: any = {};
+  const metadata: any = {};
+
+  // Apply E-E-A-T Optimization
+  if (config.enableEEAT !== false) {
+    const eeatResult = EEATOptimizer.optimizeForEEAT(enhancedContent, {
+      topic: config.topic,
+      authorName: config.authorName,
+      authorCredentials: config.authorCredentials || 'Expert',
+      enableExperienceSignals: true,
+      enableExpertiseSignals: true,
+      enableAuthoritativenesSignals: true,
+      enableTrustworthinessSignals: true
+    });
+    enhancedContent = eeatResult.html;
+    scores.eeat = eeatResult.score;
+  }
+
+  // Apply GEO (Generative Engine Optimization)
+  if (config.enableGEO !== false) {
+    const geoResult = GEOOptimizer.optimizeForAIEngines(enhancedContent, {
+      topic: config.topic,
+      enableQuotableBlocks: true,
+      enableDefinitionBlocks: true,
+      enableFactoidMarkers: true,
+      enableTLDRSummary: true
+    });
+    enhancedContent = geoResult.html;
+    scores.geo = geoResult.aiExtractionScore;
+  }
+
+  // Apply Visual Design System
+  if (config.enableVisualDesign !== false) {
+    const globalStyles = VisualDesignSystem.generateGlobalStyles();
+    enhancedContent = globalStyles + '\n' + enhancedContent;
+  }
+
+  // Apply Semantic Content Optimization
+  if (config.enableSemanticHTML !== false) {
+    enhancedContent = SemanticContentOptimizer.enhanceAccessibility(enhancedContent);
+    enhancedContent = SemanticContentOptimizer.wrapInSemanticStructure(enhancedContent, {
+      title: config.topic,
+      author: config.authorName,
+      publishDate: new Date().toISOString(),
+      category: 'Blog Post'
+    });
+    scores.semantic = SemanticContentOptimizer.calculateSemanticScore(enhancedContent);
+  }
+
+  return {
+    html: enhancedContent,
+    metadata,
+    scores
+  };
+}
+
+// Export enhancement modules for direct access
+export {
+  EEATOptimizer,
+  GEOOptimizer,
+  VisualDesignSystem,
+  SemanticContentOptimizer
+};
